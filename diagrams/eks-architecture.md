@@ -11,6 +11,7 @@ This document shows how Aldea's services **previously** ran using AWS EKS (Elast
 ## How Users Connected
 
 ```mermaid
+%%{init: {'theme': 'dark'}}%%
 flowchart LR
     subgraph Users["Your Application"]
         APP[Your App]
@@ -37,6 +38,7 @@ flowchart LR
 A simplified view of the Kubernetes-based architecture:
 
 ```mermaid
+%%{init: {'theme': 'dark'}}%%
 flowchart TB
     subgraph Internet["The Internet"]
         USER[Your Application]
@@ -87,6 +89,7 @@ flowchart TB
 In Kubernetes, applications run in "Pods" which are scheduled across worker nodes in different availability zones:
 
 ```mermaid
+%%{init: {'theme': 'dark'}}%%
 flowchart TB
     subgraph ALB["Load Balancer"]
         LB[Distributes traffic<br/>across all pods]
@@ -132,6 +135,7 @@ flowchart TB
 How network traffic flows through subnets:
 
 ```mermaid
+%%{init: {'theme': 'dark'}}%%
 flowchart TB
     subgraph Internet
         IGW[Internet Gateway]
@@ -173,6 +177,7 @@ flowchart TB
 ## Kubernetes Components Explained
 
 ```mermaid
+%%{init: {'theme': 'dark'}}%%
 flowchart TB
     subgraph Simple["What You Need to Know"]
         direction TB
@@ -198,6 +203,7 @@ flowchart TB
 ## How Services Communicated
 
 ```mermaid
+%%{init: {'theme': 'dark'}}%%
 flowchart LR
     subgraph Ingress["Traffic Entry"]
         ALB[Load Balancer]
@@ -234,6 +240,7 @@ flowchart LR
 ## Why We Moved Away from EKS
 
 ```mermaid
+%%{init: {'theme': 'dark'}}%%
 flowchart TB
     subgraph EKS_Problems["EKS Challenges"]
         E1[Complex Kubernetes<br/>learning curve]
@@ -259,6 +266,7 @@ flowchart TB
 How code was deployed in the EKS era:
 
 ```mermaid
+%%{init: {'theme': 'dark'}}%%
 flowchart LR
     subgraph Dev["Developer"]
         CODE[Push code]
