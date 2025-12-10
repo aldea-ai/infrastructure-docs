@@ -107,17 +107,9 @@ flowchart TB
         RDS_B[(RDS Standby)]
     end
 
-    subgraph AZ_C["Zone C (us-west-2c)"]
-        PubC["Public Subnet 10.0.3.0/24"]
-        PrivC["Private Subnet 10.0.30.0/24"]
-        ALB_C[ALB Node]
-        ECS_C[ECS Tasks]
-    end
-
-    IGW --> ALB_A & ALB_B & ALB_C
+    IGW --> ALB_A & ALB_B
     ALB_A --> ECS_A
     ALB_B --> ECS_B
-    ALB_C --> ECS_C
     ECS_A --> NAT_A
     ECS_B --> NAT_B
 
@@ -133,11 +125,11 @@ AWS runs services across multiple data centers (Availability Zones) for reliabil
 
 | Resource | Multi-AZ in Prod/Staging | Single-AZ in Dev |
 |----------|--------------------------|------------------|
-| **ALB** | ✅ Nodes in 3 AZs | ✅ Nodes in 2 AZs |
-| **ECS Tasks** | ✅ Distributed across 3 AZs | ⚠️ Single AZ |
+| **ALB** | ✅ Nodes in 2 AZs | ✅ Nodes in 2 AZs |
+| **ECS Tasks** | ✅ Distributed across 2 AZs | ⚠️ Single AZ |
 | **ElastiCache Redis** | ✅ Primary + Replica in different AZs | ⚠️ Single node |
 | **RDS PostgreSQL** | ✅ Multi-AZ with standby | ⚠️ Single instance |
-| **NAT Gateway** | ✅ One per AZ (2-3 NATs) | ⚠️ Single NAT |
+| **NAT Gateway** | ✅ One per AZ (2 NATs) | ⚠️ Single NAT |
 | **Subnets** | ✅ Public + Private in each AZ | ⚠️ Minimal subnets |
 
 ```mermaid
@@ -150,6 +142,7 @@ flowchart TB
         HTTP_A[HTTP-Proxy]
         BE_A[Backend]
         FE_A[Frontend]
+        SQS_A[DB Sync]
     end
 
     subgraph AZ_B["Zone B"]
@@ -157,10 +150,7 @@ flowchart TB
         HTTP_B[HTTP-Proxy]
         BE_B[Backend]
         FE_B[Frontend]
-    end
-
-    subgraph AZ_C["Zone C"]
-        SQS_C[DB Sync]
+        SQS_B[DB Sync]
     end
 
     subgraph Data["Data Layer (Multi-AZ)"]
@@ -170,7 +160,7 @@ flowchart TB
         RDS_S[(RDS Standby)]
     end
 
-    LB --> AZ_A & AZ_B & AZ_C
+    LB --> AZ_A & AZ_B
     AZ_A & AZ_B --> REDIS_P
     REDIS_P <-.-> REDIS_R
     BE_A & BE_B --> RDS_P
