@@ -78,14 +78,81 @@ flowchart TB
 
 ---
 
-## Tasks Distributed Across Availability Zones
+## Production Network Architecture (Multi-AZ)
 
-AWS runs services across multiple data centers (Availability Zones) for reliability. If one zone fails, others keep running.
+Production and staging environments use **Multi-AZ deployments** for high availability. All critical resources are distributed across multiple Availability Zones.
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4a5568', 'primaryTextColor': '#000', 'primaryBorderColor': '#2d3748', 'lineColor': '#2d3748', 'secondaryColor': '#5a6577', 'tertiaryColor': '#6b7280', 'background': '#1a202c', 'mainBkg': '#4a5568', 'secondBkg': '#5a6577', 'clusterBkg': '#3d4852', 'clusterBorder': '#2d3748', 'titleColor': '#000'}}}%%
 flowchart TB
-    subgraph ALB["Load Balancer"]
+    subgraph Internet["Internet"]
+        IGW[Internet Gateway]
+    end
+
+    subgraph VPC["Production VPC (10.0.0.0/16)"]
+        subgraph AZ_A["Availability Zone A (us-west-2a)"]
+            subgraph PubA["Public Subnet A<br/>10.0.1.0/24"]
+                ALB_A[ALB Node]
+                NAT_A[NAT Gateway A]
+            end
+            subgraph PrivA["Private Subnet A<br/>10.0.10.0/24"]
+                ECS_A[ECS Tasks]
+                REDIS_A[Redis Primary]
+                RDS_A[RDS Primary]
+            end
+        end
+
+        subgraph AZ_B["Availability Zone B (us-west-2b)"]
+            subgraph PubB["Public Subnet B<br/>10.0.2.0/24"]
+                ALB_B[ALB Node]
+                NAT_B[NAT Gateway B]
+            end
+            subgraph PrivB["Private Subnet B<br/>10.0.20.0/24"]
+                ECS_B[ECS Tasks]
+                REDIS_B[Redis Replica]
+                RDS_B[RDS Standby]
+            end
+        end
+
+        subgraph AZ_C["Availability Zone C (us-west-2c)"]
+            subgraph PubC["Public Subnet C<br/>10.0.3.0/24"]
+                ALB_C[ALB Node]
+            end
+            subgraph PrivC["Private Subnet C<br/>10.0.30.0/24"]
+                ECS_C[ECS Tasks]
+            end
+        end
+    end
+
+    IGW --> PubA & PubB & PubC
+    ALB_A & ALB_B & ALB_C --> PrivA & PrivB & PrivC
+    ECS_A --> NAT_A
+    ECS_B --> NAT_B
+    ECS_C --> NAT_A
+
+    REDIS_A <-.->|Replication| REDIS_B
+    RDS_A <-.->|Sync Replication| RDS_B
+```
+
+---
+
+## Multi-AZ Resource Distribution
+
+AWS runs services across multiple data centers (Availability Zones) for reliability. If one zone fails, others keep running.
+
+| Resource | Multi-AZ in Prod/Staging | Single-AZ in Dev |
+|----------|--------------------------|------------------|
+| **ALB** | ✅ Nodes in 3 AZs | ✅ Nodes in 2 AZs |
+| **ECS Tasks** | ✅ Distributed across 3 AZs | ⚠️ Single AZ |
+| **ElastiCache Redis** | ✅ Primary + Replica in different AZs | ⚠️ Single node |
+| **RDS PostgreSQL** | ✅ Multi-AZ with standby | ⚠️ Single instance |
+| **NAT Gateway** | ✅ One per AZ (2-3 NATs) | ⚠️ Single NAT |
+| **Subnets** | ✅ Public + Private in each AZ | ⚠️ Minimal subnets |
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4a5568', 'primaryTextColor': '#000', 'primaryBorderColor': '#2d3748', 'lineColor': '#2d3748', 'secondaryColor': '#5a6577', 'tertiaryColor': '#6b7280', 'background': '#1a202c', 'mainBkg': '#4a5568', 'secondBkg': '#5a6577', 'clusterBkg': '#3d4852', 'clusterBorder': '#2d3748', 'titleColor': '#000'}}}%%
+flowchart TB
+    subgraph ALB["Application Load Balancer (Multi-AZ)"]
         LB[Distributes traffic<br/>across all zones]
     end
 
@@ -114,15 +181,23 @@ flowchart TB
             end
         end
 
-        subgraph Data["Shared Data Layer"]
-            REDIS[(Redis<br/>Multi-AZ)]
-            RDS[(Database<br/>Multi-AZ)]
+        subgraph Data["Shared Data Layer (Multi-AZ)"]
+            subgraph RedisCluster["ElastiCache Redis"]
+                REDIS_P[(Primary<br/>Zone A)]
+                REDIS_R[(Replica<br/>Zone B)]
+            end
+            subgraph RDSCluster["RDS PostgreSQL"]
+                RDS_P[(Primary<br/>Zone A)]
+                RDS_S[(Standby<br/>Zone B)]
+            end
         end
     end
 
     LB --> SubA & SubB & SubC
-    SubA & SubB --> REDIS
-    BE_A & BE_B --> RDS
+    SubA & SubB --> REDIS_P
+    REDIS_P <-.-> REDIS_R
+    BE_A & BE_B --> RDS_P
+    RDS_P <-.->|Automatic Failover| RDS_S
 ```
 
 ---
@@ -226,42 +301,82 @@ flowchart LR
 
 ---
 
-## Dev Environment
+## Dev Environment (Single-AZ - Cost Optimized)
 
-A smaller version for testing and development:
+The dev environment uses **single-AZ deployments** to reduce costs. This is acceptable for development since uptime is not critical.
+
+**Cost savings in Dev:**
+- No Multi-AZ RDS standby (~50% RDS cost savings)
+- Single Redis node instead of cluster (~50% ElastiCache savings)
+- Single NAT Gateway (~66% NAT cost savings)
+- Fewer ECS tasks
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4a5568', 'primaryTextColor': '#000', 'primaryBorderColor': '#2d3748', 'lineColor': '#2d3748', 'secondaryColor': '#5a6577', 'tertiaryColor': '#6b7280', 'background': '#1a202c', 'mainBkg': '#4a5568', 'secondBkg': '#5a6577', 'clusterBkg': '#3d4852', 'clusterBorder': '#2d3748', 'titleColor': '#000'}}}%%
 flowchart TB
+    subgraph Internet["Internet"]
+        IGW[Internet Gateway]
+    end
+
+    subgraph VPC["Dev VPC (10.1.0.0/16)"]
+        subgraph AZ_A["Single Availability Zone (us-west-2a)"]
+            subgraph PubDev["Public Subnet<br/>10.1.1.0/24"]
+                ALB_DEV[ALB]
+                NAT_DEV[Single NAT Gateway]
+            end
+            subgraph PrivDev["Private Subnet<br/>10.1.10.0/24"]
+                WS_DEV[WS-Proxy]
+                HTTP_DEV[HTTP-Proxy]
+                BE_DEV[Backend]
+                FE_DEV[Frontend]
+            end
+        end
+
+        subgraph DataDev["Data Layer (Single-AZ)"]
+            REDIS_DEV[(Redis<br/>Single Node)]
+            RDS_DEV[(RDS<br/>No Standby)]
+        end
+    end
+
     subgraph Domains["Dev Domains"]
         D1[dev-api.aldea.ai]
         D2[dev-backend.aldea.ai]
         D3[dev-platform.aldea.ai]
     end
 
-    subgraph ECS["Dev ECS Cluster"]
-        subgraph AZ_A["Zone A"]
-            WS[WebSocket Proxy]
-            TRANS[HTTP Transcribe]
-        end
-        subgraph AZ_B["Zone B"]
-            BE[Backend API]
-            FE[Frontend Web]
-        end
+    Domains --> IGW --> PubDev
+    ALB_DEV --> PrivDev
+    PrivDev --> NAT_DEV
+    WS_DEV & HTTP_DEV --> REDIS_DEV
+    BE_DEV --> RDS_DEV
+```
+
+### Production vs Dev Comparison
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4a5568', 'primaryTextColor': '#000', 'primaryBorderColor': '#2d3748', 'lineColor': '#2d3748', 'secondaryColor': '#5a6577', 'tertiaryColor': '#6b7280', 'background': '#1a202c', 'mainBkg': '#4a5568', 'secondBkg': '#5a6577', 'clusterBkg': '#3d4852', 'clusterBorder': '#2d3748', 'titleColor': '#000'}}}%%
+flowchart LR
+    subgraph Prod["Production/Staging (Multi-AZ)"]
+        direction TB
+        P1[ALB in 3 AZs]
+        P2[ECS tasks in 3 AZs]
+        P3[Redis Primary + Replica]
+        P4[RDS Multi-AZ Standby]
+        P5[NAT Gateway per AZ]
+        P6[6 Subnets total]
     end
 
-    subgraph Backend["Backend Services"]
-        REDIS[Redis Cache]
-        STT[Speech Engine]
-        DB[(Staging Database)]
+    subgraph Dev["Dev (Single-AZ)"]
+        direction TB
+        D1[ALB in 1-2 AZs]
+        D2[ECS tasks in 1 AZ]
+        D3[Redis Single Node]
+        D4[RDS Single Instance]
+        D5[Single NAT Gateway]
+        D6[2 Subnets total]
     end
 
-    D1 --> WS & TRANS
-    D2 --> BE
-    D3 --> FE
-
-    WS & TRANS --> REDIS --> STT
-    BE --> DB
+    Prod -.-|Cost optimized| Dev
 ```
 
 ---
