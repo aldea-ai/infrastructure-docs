@@ -9,7 +9,7 @@ This document shows how Aldea's speech-to-text (ASR) services run in the cloud u
 ## How Users Connect to Aldea
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
+%%{init: {'theme': 'dark'}}%%
 flowchart LR
     subgraph Users["Your Application"]
         APP[Your App]
@@ -39,7 +39,7 @@ flowchart LR
 A simplified view of how requests flow through the system:
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
+%%{init: {'theme': 'dark'}}%%
 flowchart TB
     subgraph Internet["The Internet"]
         USER[Your Application]
@@ -83,7 +83,7 @@ flowchart TB
 AWS runs services across multiple data centers (Availability Zones) for reliability. If one zone fails, others keep running.
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
+%%{init: {'theme': 'dark'}}%%
 flowchart TB
     subgraph ALB["Load Balancer"]
         LB[Distributes traffic<br/>across all zones]
@@ -132,7 +132,7 @@ flowchart TB
 For real-time transcription where audio streams continuously:
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
+%%{init: {'theme': 'dark'}}%%
 sequenceDiagram
     participant App as Your App
     participant GA as Global Accelerator
@@ -152,7 +152,7 @@ sequenceDiagram
 
     WS->>STT: Open audio stream
 
-    rect rgb(200, 200, 200)
+    rect rgb(50, 50, 50)
         Note over App,STT: Continuous streaming loop
         App->>WS: Send audio chunk
         WS->>STT: Forward audio
@@ -171,7 +171,7 @@ sequenceDiagram
 For uploading audio files to get transcription back:
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
+%%{init: {'theme': 'dark'}}%%
 sequenceDiagram
     participant App as Your App
     participant GA as Global Accelerator
@@ -205,7 +205,7 @@ sequenceDiagram
 ## Key Differences: WebSocket vs HTTP
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
+%%{init: {'theme': 'dark'}}%%
 flowchart LR
     subgraph WebSocket["WebSocket (Live Streaming)"]
         direction TB
@@ -231,7 +231,7 @@ flowchart LR
 A smaller version for testing and development:
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
+%%{init: {'theme': 'dark'}}%%
 flowchart TB
     subgraph Domains["Dev Domains"]
         D1[dev-api.aldea.ai]
@@ -271,7 +271,7 @@ flowchart TB
 When developers push code changes:
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
+%%{init: {'theme': 'dark'}}%%
 flowchart LR
     subgraph Dev["Developer"]
         CODE[Push code<br/>to GitHub]
