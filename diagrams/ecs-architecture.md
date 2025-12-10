@@ -65,16 +65,21 @@ flowchart TB
         REDIS[Redis Cache<br/>API keys & limits]
     end
 
-    subgraph STT["STT Backend Servers (GPU)"]
-        STT1[stt-api-live-1]
-        STT2[stt-api-live-2]
-        STT3[stt-api-live-3]
+    subgraph STT_Live["STT Live Servers (GPU VMs)"]
+        LIVE1[stt-api-live-1]
+        LIVE2[stt-api-live-2]
+    end
+
+    subgraph STT_Dev["STT Dev Servers (GPU VMs)"]
+        DEV1[stt-api-dev-1]
+        DEV2[stt-api-dev-2]
     end
 
     USER --> DNS --> GA --> WAF --> ALB
     ALB --> WS & HTTP
     WS & HTTP --> REDIS
-    WS & HTTP --> STT1 & STT2 & STT3
+    HTTP --> LIVE1 & LIVE2
+    WS --> DEV1 & DEV2
 ```
 
 ---
@@ -155,16 +160,21 @@ flowchart TB
         REDIS_R[(Redis Replica)]
     end
 
-    subgraph STT["STT Backend Servers (GPU)"]
-        STT1[stt-api-live-1]
-        STT2[stt-api-live-2]
-        STT3[stt-api-live-3]
+    subgraph STT_Live["STT Live Servers (GPU VMs)"]
+        LIVE1[stt-api-live-1]
+        LIVE2[stt-api-live-2]
+    end
+
+    subgraph STT_Dev["STT Dev Servers (GPU VMs)"]
+        DEV1[stt-api-dev-1]
+        DEV2[stt-api-dev-2]
     end
 
     LB --> AZ_A & AZ_B
     AZ_A & AZ_B --> REDIS_P
     REDIS_P <-.-> REDIS_R
-    WS_A & WS_B & HTTP_A & HTTP_B --> STT
+    HTTP_A & HTTP_B --> STT_Live
+    WS_A & WS_B --> STT_Dev
 ```
 
 ---
@@ -274,16 +284,21 @@ flowchart TB
         REDIS[(Redis Single Node)]
     end
 
-    subgraph STT["STT Backend Servers (GPU)"]
-        STT1[stt-api-live-1]
-        STT2[stt-api-live-2]
-        STT3[stt-api-live-3]
+    subgraph STT_Live["STT Live Servers (GPU VMs)"]
+        LIVE1[stt-api-live-1]
+        LIVE2[stt-api-live-2]
+    end
+
+    subgraph STT_Dev["STT Dev Servers (GPU VMs)"]
+        DEV1[stt-api-dev-1]
+        DEV2[stt-api-dev-2]
     end
 
     Domains --> IGW --> ALB --> AZ_A
     AZ_A --> NAT
     WS & HTTP --> REDIS
-    WS & HTTP --> STT
+    HTTP --> STT_Live
+    WS --> STT_Dev
 ```
 
 ---
