@@ -46,7 +46,7 @@ flowchart TB
     end
 
     subgraph Edge["Edge Layer - Security & Speed"]
-        DNS[Domain Names<br/>api.aldea.ai<br/>backend.aldea.ai<br/>platform.aldea.ai]
+        DNS[Domain Names<br/>api.aldea.ai]
         GA[Global Accelerator<br/>Fast worldwide routing]
         WAF[Web Firewall<br/>Blocks bad traffic]
     end
@@ -55,25 +55,26 @@ flowchart TB
         ALB[Distributes requests<br/>to the right service]
     end
 
-    subgraph ECS["ECS Cluster - Where Services Run"]
+    subgraph ECS["ECS Cluster - Proxy Layer"]
         direction LR
         WS[WebSocket Proxy<br/>Live audio streaming]
         HTTP[HTTP Proxy<br/>File uploads]
-        BE[Backend API<br/>User accounts]
-        FE[Frontend<br/>Web dashboard]
     end
 
-    subgraph Backend["Backend Services"]
+    subgraph Data["Data Layer"]
         REDIS[Redis Cache<br/>API keys & limits]
-        STT[Speech Engine<br/>Does the transcription]
-        DB[(Database<br/>User data)]
+    end
+
+    subgraph STT["STT Backend Servers (GPU)"]
+        STT1[stt-api-live-1]
+        STT2[stt-api-live-2]
+        STT3[stt-api-live-3]
     end
 
     USER --> DNS --> GA --> WAF --> ALB
-    ALB --> WS & HTTP & BE & FE
+    ALB --> WS & HTTP
     WS & HTTP --> REDIS
-    WS & HTTP --> STT
-    BE --> DB
+    WS & HTTP --> STT1 & STT2 & STT3
 ```
 
 ---
@@ -140,31 +141,30 @@ flowchart TB
     subgraph AZ_A["Zone A"]
         WS_A[WS-Proxy]
         HTTP_A[HTTP-Proxy]
-        BE_A[Backend]
-        FE_A[Frontend]
         SQS_A[DB Sync]
     end
 
     subgraph AZ_B["Zone B"]
         WS_B[WS-Proxy]
         HTTP_B[HTTP-Proxy]
-        BE_B[Backend]
-        FE_B[Frontend]
         SQS_B[DB Sync]
     end
 
     subgraph Data["Data Layer (Multi-AZ)"]
         REDIS_P[(Redis Primary)]
         REDIS_R[(Redis Replica)]
-        RDS_P[(RDS Primary)]
-        RDS_S[(RDS Standby)]
+    end
+
+    subgraph STT["STT Backend Servers (GPU)"]
+        STT1[stt-api-live-1]
+        STT2[stt-api-live-2]
+        STT3[stt-api-live-3]
     end
 
     LB --> AZ_A & AZ_B
     AZ_A & AZ_B --> REDIS_P
     REDIS_P <-.-> REDIS_R
-    BE_A & BE_B --> RDS_P
-    RDS_P <-.->|Failover| RDS_S
+    WS_A & WS_B & HTTP_A & HTTP_B --> STT
 ```
 
 ---
@@ -259,8 +259,6 @@ The dev environment uses **single-AZ deployments** to reduce costs. This is acce
 flowchart TB
     subgraph Domains["Dev Domains"]
         D1[dev-api.aldea.ai]
-        D2[dev-backend.aldea.ai]
-        D3[dev-platform.aldea.ai]
     end
 
     IGW[Internet Gateway]
@@ -270,19 +268,22 @@ flowchart TB
     subgraph AZ_A["Single Zone (us-west-2a)"]
         WS[WS-Proxy]
         HTTP[HTTP-Proxy]
-        BE[Backend]
-        FE[Frontend]
     end
 
     subgraph Data["Data Layer (Single-AZ)"]
         REDIS[(Redis Single Node)]
-        RDS[(RDS No Standby)]
+    end
+
+    subgraph STT["STT Backend Servers (GPU)"]
+        STT1[stt-api-live-1]
+        STT2[stt-api-live-2]
+        STT3[stt-api-live-3]
     end
 
     Domains --> IGW --> ALB --> AZ_A
     AZ_A --> NAT
     WS & HTTP --> REDIS
-    BE --> RDS
+    WS & HTTP --> STT
 ```
 
 ---
