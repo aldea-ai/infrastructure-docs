@@ -92,6 +92,7 @@ flowchart TB
                 WS_A[WS-Proxy Task]
                 HTTP_A[HTTP-Proxy Task]
                 BE_A[Backend Task]
+                FE_A[Frontend Task]
             end
         end
 
@@ -100,12 +101,12 @@ flowchart TB
                 WS_B[WS-Proxy Task]
                 HTTP_B[HTTP-Proxy Task]
                 BE_B[Backend Task]
+                FE_B[Frontend Task]
             end
         end
 
         subgraph AZ_C["Zone C (us-west-2c)"]
             subgraph SubC["Private Subnet C"]
-                FE_C[Frontend Task]
                 SQS_C[DB Sync Task]
             end
         end
