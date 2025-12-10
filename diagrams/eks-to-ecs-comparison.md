@@ -9,7 +9,7 @@ We moved from Kubernetes (EKS) to AWS's simpler container service (ECS) to reduc
 ## Before & After Overview
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1e3a5f', 'primaryTextColor': '#fff', 'primaryBorderColor': '#38bdf8', 'lineColor': '#38bdf8', 'secondaryColor': '#4c1d95', 'tertiaryColor': '#064e3b', 'textColor': '#fff', 'clusterBkg': '#0f172a', 'clusterBorder': '#38bdf8'}}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart LR
     subgraph Before["BEFORE: Kubernetes (EKS)"]
         direction TB
@@ -37,7 +37,7 @@ flowchart LR
 ### EKS (Before)
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1e3a5f', 'primaryTextColor': '#fff', 'primaryBorderColor': '#38bdf8', 'lineColor': '#38bdf8', 'secondaryColor': '#4c1d95', 'tertiaryColor': '#064e3b', 'textColor': '#fff', 'clusterBkg': '#0f172a', 'clusterBorder': '#38bdf8'}}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart TB
     subgraph User["Your App"]
         APP[Application]
@@ -65,7 +65,7 @@ flowchart TB
 ### ECS (After)
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1e3a5f', 'primaryTextColor': '#fff', 'primaryBorderColor': '#38bdf8', 'lineColor': '#38bdf8', 'secondaryColor': '#4c1d95', 'tertiaryColor': '#064e3b', 'textColor': '#fff', 'clusterBkg': '#0f172a', 'clusterBorder': '#38bdf8'}}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart TB
     subgraph User["Your App"]
         APP[Application]
@@ -94,7 +94,7 @@ flowchart TB
 ## What Got Simpler
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1e3a5f', 'primaryTextColor': '#fff', 'primaryBorderColor': '#38bdf8', 'lineColor': '#38bdf8', 'secondaryColor': '#4c1d95', 'tertiaryColor': '#064e3b', 'textColor': '#fff', 'clusterBkg': '#0f172a', 'clusterBorder': '#38bdf8'}}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart TB
     subgraph Removed["Things We No Longer Manage"]
         R1[Kubernetes API Server]
@@ -135,7 +135,7 @@ flowchart TB
 ### EKS Deployment (Complex)
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1e3a5f', 'primaryTextColor': '#fff', 'primaryBorderColor': '#38bdf8', 'lineColor': '#38bdf8', 'secondaryColor': '#4c1d95', 'tertiaryColor': '#064e3b', 'textColor': '#fff', 'clusterBkg': '#0f172a', 'clusterBorder': '#38bdf8'}}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart LR
     subgraph Steps["7 Steps"]
         S1[Build image]
@@ -153,7 +153,7 @@ flowchart LR
 ### ECS Deployment (Simple)
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1e3a5f', 'primaryTextColor': '#fff', 'primaryBorderColor': '#38bdf8', 'lineColor': '#38bdf8', 'secondaryColor': '#4c1d95', 'tertiaryColor': '#064e3b', 'textColor': '#fff', 'clusterBkg': '#0f172a', 'clusterBorder': '#38bdf8'}}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart LR
     subgraph Steps["4 Steps"]
         S1[Build image]
@@ -172,7 +172,7 @@ flowchart LR
 What became what:
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1e3a5f', 'primaryTextColor': '#fff', 'primaryBorderColor': '#38bdf8', 'lineColor': '#38bdf8', 'secondaryColor': '#4c1d95', 'tertiaryColor': '#064e3b', 'textColor': '#fff', 'clusterBkg': '#0f172a', 'clusterBorder': '#38bdf8'}}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart LR
     subgraph EKS["EKS Components"]
         E1[Pod]
@@ -208,7 +208,7 @@ flowchart LR
 ## Cost Model Change
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1e3a5f', 'primaryTextColor': '#fff', 'primaryBorderColor': '#38bdf8', 'lineColor': '#38bdf8', 'secondaryColor': '#4c1d95', 'tertiaryColor': '#064e3b', 'textColor': '#fff', 'clusterBkg': '#0f172a', 'clusterBorder': '#38bdf8'}}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart TB
     subgraph EKS_Cost["EKS Costs"]
         EC1[EKS Control Plane<br/>$73/month]
@@ -228,7 +228,7 @@ flowchart TB
 ## Reliability Comparison
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1e3a5f', 'primaryTextColor': '#fff', 'primaryBorderColor': '#38bdf8', 'lineColor': '#38bdf8', 'secondaryColor': '#4c1d95', 'tertiaryColor': '#064e3b', 'textColor': '#fff', 'clusterBkg': '#0f172a', 'clusterBorder': '#38bdf8'}}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart TB
     subgraph EKS_HA["EKS High Availability"]
         EH1[Control plane - AWS managed]
@@ -265,7 +265,7 @@ flowchart TB
 ## Summary
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1e3a5f', 'primaryTextColor': '#fff', 'primaryBorderColor': '#38bdf8', 'lineColor': '#38bdf8', 'secondaryColor': '#4c1d95', 'tertiaryColor': '#064e3b', 'textColor': '#fff', 'clusterBkg': '#0f172a', 'clusterBorder': '#38bdf8'}}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart LR
     subgraph Before["Before: EKS"]
         B[Complex<br/>Many moving parts<br/>K8s expertise needed]
