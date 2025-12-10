@@ -9,7 +9,7 @@ This document shows how Aldea's speech-to-text (ASR) services run in the cloud u
 ## How Users Connect to Aldea
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4a5568', 'primaryTextColor': '#000', 'primaryBorderColor': '#2d3748', 'lineColor': '#2d3748', 'secondaryColor': '#5a6577', 'tertiaryColor': '#6b7280', 'background': '#1a202c', 'mainBkg': '#4a5568', 'secondBkg': '#5a6577', 'border1': '#2d3748', 'border2': '#2d3748', 'note1': '#5a6577', 'note2': '#000', 'text1': '#000', 'text2': '#000', 'critical': '#4a5568', 'done': '#5a6577', 'arrowheadColor': '#2d3748', 'fontFamily': 'arial', 'clusterBkg': '#3d4852', 'clusterBorder': '#2d3748', 'titleColor': '#000'}}}%%
 flowchart LR
     subgraph Users["Your Application"]
         APP[Your App]
@@ -39,7 +39,7 @@ flowchart LR
 A simplified view of how requests flow through the system:
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4a5568', 'primaryTextColor': '#000', 'primaryBorderColor': '#2d3748', 'lineColor': '#2d3748', 'secondaryColor': '#5a6577', 'tertiaryColor': '#6b7280', 'background': '#1a202c', 'mainBkg': '#4a5568', 'secondBkg': '#5a6577', 'clusterBkg': '#3d4852', 'clusterBorder': '#2d3748', 'titleColor': '#000'}}}%%
 flowchart TB
     subgraph Internet["The Internet"]
         USER[Your Application]
@@ -83,7 +83,7 @@ flowchart TB
 AWS runs services across multiple data centers (Availability Zones) for reliability. If one zone fails, others keep running.
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4a5568', 'primaryTextColor': '#000', 'primaryBorderColor': '#2d3748', 'lineColor': '#2d3748', 'secondaryColor': '#5a6577', 'tertiaryColor': '#6b7280', 'background': '#1a202c', 'mainBkg': '#4a5568', 'secondBkg': '#5a6577', 'clusterBkg': '#3d4852', 'clusterBorder': '#2d3748', 'titleColor': '#000'}}}%%
 flowchart TB
     subgraph ALB["Load Balancer"]
         LB[Distributes traffic<br/>across all zones]
@@ -132,7 +132,7 @@ flowchart TB
 For real-time transcription where audio streams continuously:
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4a5568', 'primaryTextColor': '#000', 'primaryBorderColor': '#2d3748', 'lineColor': '#2d3748', 'actorBkg': '#4a5568', 'actorBorder': '#2d3748', 'actorTextColor': '#000', 'actorLineColor': '#2d3748', 'signalColor': '#2d3748', 'signalTextColor': '#000', 'labelBoxBkgColor': '#5a6577', 'labelBoxBorderColor': '#2d3748', 'labelTextColor': '#000', 'loopTextColor': '#000', 'noteBkgColor': '#5a6577', 'noteTextColor': '#000', 'noteBorderColor': '#2d3748', 'activationBkgColor': '#6b7280', 'activationBorderColor': '#2d3748', 'sequenceNumberColor': '#000'}}}%%
 sequenceDiagram
     participant App as Your App
     participant GA as Global Accelerator
@@ -152,7 +152,7 @@ sequenceDiagram
 
     WS->>STT: Open audio stream
 
-    rect rgb(50, 50, 50)
+    rect rgb(74, 85, 104)
         Note over App,STT: Continuous streaming loop
         App->>WS: Send audio chunk
         WS->>STT: Forward audio
@@ -171,7 +171,7 @@ sequenceDiagram
 For uploading audio files to get transcription back:
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4a5568', 'primaryTextColor': '#000', 'primaryBorderColor': '#2d3748', 'lineColor': '#2d3748', 'actorBkg': '#4a5568', 'actorBorder': '#2d3748', 'actorTextColor': '#000', 'actorLineColor': '#2d3748', 'signalColor': '#2d3748', 'signalTextColor': '#000', 'labelBoxBkgColor': '#5a6577', 'labelBoxBorderColor': '#2d3748', 'labelTextColor': '#000', 'loopTextColor': '#000', 'noteBkgColor': '#5a6577', 'noteTextColor': '#000', 'noteBorderColor': '#2d3748', 'activationBkgColor': '#6b7280', 'activationBorderColor': '#2d3748', 'sequenceNumberColor': '#000'}}}%%
 sequenceDiagram
     participant App as Your App
     participant GA as Global Accelerator
@@ -205,7 +205,7 @@ sequenceDiagram
 ## Key Differences: WebSocket vs HTTP
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4a5568', 'primaryTextColor': '#000', 'primaryBorderColor': '#2d3748', 'lineColor': '#2d3748', 'secondaryColor': '#5a6577', 'tertiaryColor': '#6b7280', 'background': '#1a202c', 'mainBkg': '#4a5568', 'secondBkg': '#5a6577', 'clusterBkg': '#3d4852', 'clusterBorder': '#2d3748', 'titleColor': '#000'}}}%%
 flowchart LR
     subgraph WebSocket["WebSocket (Live Streaming)"]
         direction TB
@@ -231,7 +231,7 @@ flowchart LR
 A smaller version for testing and development:
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4a5568', 'primaryTextColor': '#000', 'primaryBorderColor': '#2d3748', 'lineColor': '#2d3748', 'secondaryColor': '#5a6577', 'tertiaryColor': '#6b7280', 'background': '#1a202c', 'mainBkg': '#4a5568', 'secondBkg': '#5a6577', 'clusterBkg': '#3d4852', 'clusterBorder': '#2d3748', 'titleColor': '#000'}}}%%
 flowchart TB
     subgraph Domains["Dev Domains"]
         D1[dev-api.aldea.ai]
@@ -271,7 +271,7 @@ flowchart TB
 When developers push code changes:
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4a5568', 'primaryTextColor': '#000', 'primaryBorderColor': '#2d3748', 'lineColor': '#2d3748', 'secondaryColor': '#5a6577', 'tertiaryColor': '#6b7280', 'background': '#1a202c', 'mainBkg': '#4a5568', 'secondBkg': '#5a6577', 'clusterBkg': '#3d4852', 'clusterBorder': '#2d3748', 'titleColor': '#000'}}}%%
 flowchart LR
     subgraph Dev["Developer"]
         CODE[Push code<br/>to GitHub]
