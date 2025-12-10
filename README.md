@@ -1,83 +1,51 @@
 # Aldea Infrastructure Documentation
 
-Infrastructure architecture diagrams and documentation for Aldea's cloud infrastructure.
+Visual diagrams explaining Aldea's cloud infrastructure architecture.
 
-## Overview
+## Quick Links
 
-This repository contains Mermaid.js diagrams documenting Aldea's infrastructure architecture, including:
+| Diagram | What It Shows |
+|---------|---------------|
+| [ECS Architecture](diagrams/ecs-architecture.md) | **Current** production setup using AWS ECS |
+| [EKS Architecture](diagrams/eks-architecture.md) | **Previous** Kubernetes-based setup (historical) |
+| [Migration Comparison](diagrams/eks-to-ecs-comparison.md) | Side-by-side comparison of EKS vs ECS |
 
-- **Current ECS Architecture** - AWS ECS Fargate-based infrastructure
-- **Previous EKS Architecture** - AWS EKS Kubernetes-based infrastructure (historical reference)
-- **Migration Comparison** - Side-by-side comparison of EKS to ECS migration
+## What Does Aldea Do?
 
-## Diagrams
+Aldea provides speech-to-text (ASR) services. Users connect to:
 
-### Current Production Architecture
+- **api.aldea.ai** - Real-time audio transcription
+- **backend.aldea.ai** - Account management API
+- **platform.aldea.ai** - Web dashboard
 
-| Document | Description |
-|----------|-------------|
-| [ECS Architecture](diagrams/ecs-architecture.md) | Current ECS Fargate infrastructure for ASR services |
-
-### Historical Reference
-
-| Document | Description |
-|----------|-------------|
-| [EKS Architecture](diagrams/eks-architecture.md) | Previous EKS/Kubernetes infrastructure |
-
-### Migration Documentation
-
-| Document | Description |
-|----------|-------------|
-| [EKS to ECS Comparison](diagrams/eks-to-ecs-comparison.md) | Detailed comparison of migration changes |
-
-## Viewing Diagrams
-
-The diagrams use [Mermaid.js](https://mermaid.js.org/) syntax. You can view them:
-
-1. **GitHub** - GitHub natively renders Mermaid diagrams in markdown files
-2. **VS Code** - Install the "Markdown Preview Mermaid Support" extension
-3. **Mermaid Live Editor** - Paste diagram code at https://mermaid.live
-
-## Infrastructure Summary
-
-### Current Architecture (ECS)
+## Architecture at a Glance
 
 ```
-Users → Route53 → Global Accelerator → WAF → ALB → ECS Fargate Services
-                                                  ├── ws-proxy (WebSocket)
-                                                  ├── http-proxy (HTTP)
-                                                  ├── backend (API)
-                                                  └── frontend (UI)
+Your App → api.aldea.ai → Load Balancer → ECS Services → Speech Engine
+                                              ↓
+                                          Redis Cache
+                                          (API keys)
 ```
 
-**Key Components:**
-- AWS ECS Fargate (serverless containers)
-- ElastiCache Redis (API key validation, rate limiting)
-- RDS PostgreSQL (application data)
-- Global Accelerator (anycast IPs)
-- AWS WAF (security)
+## Viewing the Diagrams
 
-### Environments
+The diagrams use [Mermaid.js](https://mermaid.js.org/) and render automatically on GitHub.
 
-| Environment | Cluster | Domain |
-|-------------|---------|--------|
-| Production | prod-ws-proxy | api.aldea.ai |
-| Dev | aldea-ecs-dev | dev-api.aldea.ai |
+You can also:
+- Use VS Code with "Markdown Preview Mermaid Support" extension
+- Paste diagram code at https://mermaid.live
+
+## Key Takeaways
+
+1. **Current Architecture (ECS)**: Simple, serverless, AWS-native
+2. **Previous Architecture (EKS)**: Complex, Kubernetes-based
+3. **Why We Migrated**: Reduced operational complexity
 
 ## Related Repositories
 
-| Repository | Purpose |
-|------------|---------|
-| [aldea-proxy-services](https://github.com/aldea-ai/aldea-proxy-services) | Proxy service source code |
-| [aldea-eks-platform](https://github.com/aldea-ai/aldea-eks-platform) | Terraform infrastructure code |
-| [imp-backend](https://github.com/aldea-ai/imp-backend) | Platform API backend |
-| [imp-frontend](https://github.com/aldea-ai/imp-frontend) | Platform web frontend |
-
-## Contributing
-
-When updating diagrams:
-
-1. Use Mermaid.js syntax
-2. Test diagrams render correctly before committing
-3. Keep diagrams focused on specific aspects (networking, services, CI/CD, etc.)
-4. Update this README if adding new diagram files
+| Repo | Purpose |
+|------|---------|
+| [aldea-proxy-services](https://github.com/aldea-ai/aldea-proxy-services) | Proxy service code |
+| [aldea-eks-platform](https://github.com/aldea-ai/aldea-eks-platform) | Terraform infrastructure |
+| [imp-backend](https://github.com/aldea-ai/imp-backend) | Platform API |
+| [imp-frontend](https://github.com/aldea-ai/imp-frontend) | Web dashboard |

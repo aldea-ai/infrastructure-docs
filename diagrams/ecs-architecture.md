@@ -1,226 +1,287 @@
 # Aldea ECS Architecture
 
-## Overview
+## What is This?
 
-Current production architecture using AWS ECS Fargate for all ASR (Automatic Speech Recognition) services.
+This document shows how Aldea's speech-to-text (ASR) services run in the cloud using AWS ECS (Elastic Container Service). Think of ECS as a way to run applications in isolated containers without managing servers.
 
-## Production ECS Cluster (prod-ws-proxy)
+---
 
-```mermaid
-flowchart TB
-    subgraph Internet
-        Users[Users/Clients]
-    end
-
-    subgraph DNS["Route53 DNS"]
-        api[api.aldea.ai]
-        backend[backend.aldea.ai]
-        platform[platform.aldea.ai]
-    end
-
-    subgraph GA["Global Accelerator"]
-        GA_EP[Anycast IPs<br/>75.2.x.x / 99.83.x.x]
-    end
-
-    subgraph WAF["AWS WAF"]
-        WAF_RULES[Rate Limiting<br/>Geo Blocking<br/>IP Allowlist]
-    end
-
-    subgraph ALB["Application Load Balancer"]
-        HTTPS_LIS[HTTPS Listener :443]
-
-        subgraph Routing["Routing Rules"]
-            R1[Priority 10: platform.aldea.ai → Frontend]
-            R2[Priority 20: backend.aldea.ai → Backend]
-            R3[Priority 100: WebSocket + /listen/* → WS-Proxy]
-            R4[Priority 200: HTTP + /listen/* → HTTP-Proxy]
-            R5[Priority 300: /transcribe/* → HTTP-Proxy]
-        end
-    end
-
-    subgraph ECS["ECS Cluster: prod-ws-proxy"]
-        subgraph Services["Fargate Services"]
-            WS1[ws-proxy-live1<br/>WebSocket Streaming]
-            WS2[ws-proxy-live2<br/>WebSocket Streaming]
-            HTTP1[http-proxy-live1<br/>HTTP Transcription]
-            HTTP2[http-proxy-live2<br/>HTTP Transcription]
-            BE[imp-backend<br/>Platform API]
-            FE[imp-frontend<br/>Platform UI]
-            SQS[sqs-updater<br/>DB Sync]
-        end
-
-        subgraph TG["Target Groups"]
-            TG_WS1[ws-proxy-live1 TG]
-            TG_WS2[ws-proxy-live2 TG]
-            TG_HTTP1[http-proxy-live1 TG]
-            TG_HTTP2[http-proxy-live2 TG]
-            TG_BE[backend TG]
-            TG_FE[frontend TG]
-        end
-    end
-
-    subgraph Backend_Services["Backend Services"]
-        subgraph Redis["ElastiCache Redis"]
-            REDIS[Redis 7.1<br/>TLS Enabled<br/>Multi-AZ]
-        end
-
-        subgraph STT["STT API Backends"]
-            STT1[stt-api-live-1.aldea.ai:8800]
-            STT2[stt-api-live-2.aldea.ai:8800]
-        end
-
-        subgraph RDS["RDS PostgreSQL"]
-            DB[(aldea-prod<br/>PostgreSQL)]
-        end
-
-        subgraph SQS["SQS Queue"]
-            QUEUE[usage-updates-queue]
-        end
-    end
-
-    subgraph ECR["ECR Repositories"]
-        ECR_WS[prod-ws-proxy-ws-proxy]
-        ECR_HTTP[prod-ws-proxy-http-proxy]
-        ECR_BE[prod-ws-proxy-backend]
-        ECR_FE[prod-ws-proxy-frontend]
-        ECR_SQS[prod-ws-proxy-sqs-updater]
-    end
-
-    subgraph Secrets["Secrets Manager"]
-        SEC_REDIS[redis-auth-token]
-        SEC_BE[imp-backend/env]
-        SEC_FE[imp-frontend/env]
-    end
-
-    Users --> api & backend & platform
-    api & backend & platform --> GA_EP
-    GA_EP --> WAF_RULES
-    WAF_RULES --> HTTPS_LIS
-    HTTPS_LIS --> Routing
-
-    R1 --> TG_FE --> FE
-    R2 --> TG_BE --> BE
-    R3 --> TG_WS1 & TG_WS2
-    TG_WS1 --> WS1
-    TG_WS2 --> WS2
-    R4 & R5 --> TG_HTTP1 & TG_HTTP2
-    TG_HTTP1 --> HTTP1
-    TG_HTTP2 --> HTTP2
-
-    WS1 & WS2 --> REDIS
-    WS1 --> STT1
-    WS2 --> STT2
-    HTTP1 --> STT1
-    HTTP2 --> STT2
-
-    BE --> DB
-    BE --> QUEUE
-    SQS --> QUEUE
-    SQS --> DB
-
-    WS1 & WS2 & HTTP1 & HTTP2 & BE & FE & SQS -.-> SEC_REDIS & SEC_BE & SEC_FE
-```
-
-## Dev ECS Cluster (aldea-ecs-dev)
-
-```mermaid
-flowchart TB
-    subgraph DNS["Route53 DNS"]
-        dev_api[dev-api.aldea.ai]
-        dev_backend[dev-backend.aldea.ai]
-        dev_platform[dev-platform.aldea.ai]
-    end
-
-    subgraph ALB["Application Load Balancer"]
-        DEV_LIS[HTTPS Listener :443]
-    end
-
-    subgraph ECS["ECS Cluster: aldea-ecs-dev"]
-        WS[ws-proxy<br/>WebSocket]
-        TRANS[transcribe<br/>HTTP API]
-        BE_DEV[backend<br/>Platform API]
-        FE_DEV[frontend<br/>Platform UI]
-        SQS_DEV[sqs-updater<br/>DB Sync]
-    end
-
-    subgraph Backend["Backend Services"]
-        REDIS_DEV[ElastiCache Redis<br/>dev-ws-proxy]
-        STT_DEV[STT API Backend]
-        DB_DEV[(Staging DB<br/>PostgreSQL)]
-    end
-
-    dev_api --> DEV_LIS
-    dev_backend --> DEV_LIS
-    dev_platform --> DEV_LIS
-
-    DEV_LIS --> WS & TRANS & BE_DEV & FE_DEV
-
-    WS --> REDIS_DEV --> STT_DEV
-    TRANS --> STT_DEV
-    BE_DEV --> DB_DEV
-    SQS_DEV --> DB_DEV
-```
-
-## Service Communication Flow
-
-```mermaid
-sequenceDiagram
-    participant Client
-    participant GA as Global Accelerator
-    participant WAF as AWS WAF
-    participant ALB as Load Balancer
-    participant WS as WS-Proxy
-    participant Redis as ElastiCache
-    participant STT as STT API
-
-    Note over Client,STT: WebSocket Streaming Flow
-
-    Client->>GA: wss://api.aldea.ai/listen/v1
-    GA->>WAF: Route to origin
-    WAF->>ALB: Pass (if allowed)
-    ALB->>ALB: Detect WebSocket header
-    ALB->>WS: Forward to ws-proxy
-    WS->>Redis: Validate API key
-    Redis-->>WS: Key valid + rate limit OK
-    WS->>STT: Open upstream connection
-
-    loop Audio Streaming
-        Client->>WS: Audio chunks
-        WS->>STT: Forward audio
-        STT-->>WS: Transcription results
-        WS-->>Client: JSON results
-    end
-
-    WS->>Redis: Update usage metrics
-```
-
-## CI/CD Pipeline Flow
+## How Users Connect to Aldea
 
 ```mermaid
 flowchart LR
-    subgraph GitHub["GitHub Repositories"]
-        PROXY[aldea-proxy-services]
-        BACKEND[imp-backend]
-        FRONTEND[imp-frontend]
-        INFRA[aldea-eks-platform]
+    subgraph Users["Your Application"]
+        APP[Your App]
     end
 
-    subgraph GHA["GitHub Actions"]
-        BUILD[Build & Push to ECR]
-        DEPLOY[Deploy to ECS]
+    subgraph Domains["Web Addresses"]
+        API[api.aldea.ai<br/>Speech-to-Text API]
+        BACK[backend.aldea.ai<br/>Platform API]
+        PLAT[platform.aldea.ai<br/>Web Dashboard]
     end
 
-    subgraph AWS["AWS"]
-        ECR[ECR Registry]
-        ECS[ECS Service Update]
-        ROLL[Rolling Deployment]
+    subgraph Services["What Each Does"]
+        S1[Real-time transcription<br/>& audio processing]
+        S2[Account management<br/>& billing]
+        S3[Web interface to<br/>manage your account]
     end
 
-    PROXY & BACKEND & FRONTEND -->|push to dev/main| BUILD
-    BUILD -->|Docker image| ECR
-    ECR --> DEPLOY
-    DEPLOY -->|Update task definition| ECS
-    ECS --> ROLL
+    APP --> API --> S1
+    APP --> BACK --> S2
+    APP --> PLAT --> S3
+```
 
-    INFRA -->|Terraform| AWS
+---
+
+## Production Architecture Overview
+
+A simplified view of how requests flow through the system:
+
+```mermaid
+flowchart TB
+    subgraph Internet["The Internet"]
+        USER[Your Application]
+    end
+
+    subgraph Edge["Edge Layer - Security & Speed"]
+        DNS[Domain Names<br/>api.aldea.ai<br/>backend.aldea.ai<br/>platform.aldea.ai]
+        GA[Global Accelerator<br/>Fast worldwide routing]
+        WAF[Web Firewall<br/>Blocks bad traffic]
+    end
+
+    subgraph LB["Load Balancer - Traffic Director"]
+        ALB[Distributes requests<br/>to the right service]
+    end
+
+    subgraph ECS["ECS Cluster - Where Services Run"]
+        direction LR
+        WS[WebSocket Proxy<br/>Live audio streaming]
+        HTTP[HTTP Proxy<br/>File uploads]
+        BE[Backend API<br/>User accounts]
+        FE[Frontend<br/>Web dashboard]
+    end
+
+    subgraph Backend["Backend Services"]
+        REDIS[Redis Cache<br/>API keys & limits]
+        STT[Speech Engine<br/>Does the transcription]
+        DB[(Database<br/>User data)]
+    end
+
+    USER --> DNS --> GA --> WAF --> ALB
+    ALB --> WS & HTTP & BE & FE
+    WS & HTTP --> REDIS
+    WS & HTTP --> STT
+    BE --> DB
+```
+
+---
+
+## Tasks Distributed Across Availability Zones
+
+AWS runs services across multiple data centers (Availability Zones) for reliability. If one zone fails, others keep running.
+
+```mermaid
+flowchart TB
+    subgraph ALB["Load Balancer"]
+        LB[Distributes traffic<br/>across all zones]
+    end
+
+    subgraph VPC["Virtual Private Cloud"]
+        subgraph AZ_A["Zone A (us-west-2a)"]
+            subgraph SubA["Private Subnet A"]
+                WS_A[WS-Proxy Task]
+                HTTP_A[HTTP-Proxy Task]
+                BE_A[Backend Task]
+            end
+        end
+
+        subgraph AZ_B["Zone B (us-west-2b)"]
+            subgraph SubB["Private Subnet B"]
+                WS_B[WS-Proxy Task]
+                HTTP_B[HTTP-Proxy Task]
+                BE_B[Backend Task]
+            end
+        end
+
+        subgraph AZ_C["Zone C (us-west-2c)"]
+            subgraph SubC["Private Subnet C"]
+                FE_C[Frontend Task]
+                SQS_C[DB Sync Task]
+            end
+        end
+
+        subgraph Data["Shared Data Layer"]
+            REDIS[(Redis<br/>Multi-AZ)]
+            RDS[(Database<br/>Multi-AZ)]
+        end
+    end
+
+    LB --> SubA & SubB & SubC
+    SubA & SubB --> REDIS
+    BE_A & BE_B --> RDS
+```
+
+---
+
+## WebSocket Flow - Live Audio Streaming
+
+For real-time transcription where audio streams continuously:
+
+```mermaid
+sequenceDiagram
+    participant App as Your App
+    participant GA as Global Accelerator
+    participant LB as Load Balancer
+    participant WS as WebSocket Proxy
+    participant Redis as Redis Cache
+    participant STT as Speech Engine
+
+    Note over App,STT: Real-time Audio Streaming
+
+    App->>GA: Connect to wss://api.aldea.ai/listen
+    GA->>LB: Route to nearest server
+    LB->>WS: Open WebSocket connection
+
+    WS->>Redis: Check API key valid?
+    Redis-->>WS: Yes, allowed 10 connections
+
+    WS->>STT: Open audio stream
+
+    rect rgb(240, 248, 255)
+        Note over App,STT: Continuous streaming loop
+        App->>WS: Send audio chunk
+        WS->>STT: Forward audio
+        STT-->>WS: "Hello world"
+        WS-->>App: {"text": "Hello world"}
+    end
+
+    App->>WS: Close connection
+    WS->>Redis: Log: used 45 seconds
+```
+
+---
+
+## HTTP Flow - File Upload Transcription
+
+For uploading audio files to get transcription back:
+
+```mermaid
+sequenceDiagram
+    participant App as Your App
+    participant GA as Global Accelerator
+    participant LB as Load Balancer
+    participant HTTP as HTTP Proxy
+    participant Redis as Redis Cache
+    participant STT as Speech Engine
+
+    Note over App,STT: File Upload Transcription
+
+    App->>GA: POST api.aldea.ai/v1/listen<br/>+ audio file (meeting.wav)
+    GA->>LB: Route request
+    LB->>HTTP: Forward to HTTP service
+
+    HTTP->>Redis: Check API key valid?
+    Redis-->>HTTP: Yes, allowed
+
+    HTTP->>STT: Send complete audio file
+
+    Note over STT: Processing audio...<br/>This may take a few seconds
+
+    STT-->>HTTP: Complete transcription
+
+    HTTP->>Redis: Log: processed 5 minutes of audio
+
+    HTTP-->>App: {"text": "Meeting transcript..."}
+```
+
+---
+
+## Key Differences: WebSocket vs HTTP
+
+```mermaid
+flowchart LR
+    subgraph WebSocket["WebSocket (Live Streaming)"]
+        direction TB
+        W1[Persistent connection]
+        W2[Audio sent in small chunks]
+        W3[Results arrive in real-time]
+        W4[Best for: live calls, meetings]
+    end
+
+    subgraph HTTP["HTTP (File Upload)"]
+        direction TB
+        H1[Single request/response]
+        H2[Complete file uploaded]
+        H3[Results after processing]
+        H4[Best for: recorded files]
+    end
+```
+
+---
+
+## Dev Environment
+
+A smaller version for testing and development:
+
+```mermaid
+flowchart TB
+    subgraph Domains["Dev Domains"]
+        D1[dev-api.aldea.ai]
+        D2[dev-backend.aldea.ai]
+        D3[dev-platform.aldea.ai]
+    end
+
+    subgraph ECS["Dev ECS Cluster"]
+        subgraph AZ_A["Zone A"]
+            WS[WebSocket Proxy]
+            TRANS[HTTP Transcribe]
+        end
+        subgraph AZ_B["Zone B"]
+            BE[Backend API]
+            FE[Frontend Web]
+        end
+    end
+
+    subgraph Backend["Backend Services"]
+        REDIS[Redis Cache]
+        STT[Speech Engine]
+        DB[(Staging Database)]
+    end
+
+    D1 --> WS & TRANS
+    D2 --> BE
+    D3 --> FE
+
+    WS & TRANS --> REDIS --> STT
+    BE --> DB
+```
+
+---
+
+## How Code Gets Deployed
+
+When developers push code changes:
+
+```mermaid
+flowchart LR
+    subgraph Dev["Developer"]
+        CODE[Push code<br/>to GitHub]
+    end
+
+    subgraph CI["Automated Build"]
+        BUILD[Build container<br/>image]
+        TEST[Run tests]
+        PUSH[Push to<br/>image registry]
+    end
+
+    subgraph Deploy["Deployment"]
+        UPDATE[Update service<br/>with new image]
+        ROLL[Rolling update<br/>zero downtime]
+    end
+
+    subgraph Live["Production"]
+        NEW[New version<br/>running]
+    end
+
+    CODE --> BUILD --> TEST --> PUSH --> UPDATE --> ROLL --> NEW
 ```

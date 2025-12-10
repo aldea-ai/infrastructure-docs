@@ -1,275 +1,293 @@
 # Aldea EKS Architecture (Previous)
 
-## Overview
+## What is This?
 
-Previous production architecture using AWS EKS with Kubernetes for workload orchestration. This architecture was replaced with ECS Fargate for simplified operations.
+This document shows how Aldea's services **previously** ran using AWS EKS (Elastic Kubernetes Service). We migrated to ECS for simpler operations. This is kept for historical reference.
 
-## Production EKS Cluster (prod-eks)
+**Key Difference:** EKS uses Kubernetes (a complex container orchestration system) while ECS is AWS's simpler native container service.
+
+---
+
+## How Users Connected
+
+```mermaid
+flowchart LR
+    subgraph Users["Your Application"]
+        APP[Your App]
+    end
+
+    subgraph Domains["Web Addresses"]
+        API[api.aldea.ai<br/>Speech API]
+        BACK[backend.aldea.ai<br/>Platform API]
+        PLAT[platform.aldea.ai<br/>Web Dashboard]
+    end
+
+    subgraph K8s["Kubernetes Cluster"]
+        ING[Ingress Controller<br/>Routes traffic]
+        PODS[Application Pods]
+    end
+
+    APP --> API & BACK & PLAT --> ING --> PODS
+```
+
+---
+
+## EKS Architecture Overview
+
+A simplified view of the Kubernetes-based architecture:
+
+```mermaid
+flowchart TB
+    subgraph Internet["The Internet"]
+        USER[Your Application]
+    end
+
+    subgraph DNS["Domain Names"]
+        DOMAINS[api.aldea.ai<br/>backend.aldea.ai<br/>platform.aldea.ai]
+    end
+
+    subgraph LB["Load Balancer"]
+        ALB[Application Load Balancer<br/>Managed by K8s Ingress]
+    end
+
+    subgraph EKS["Kubernetes Cluster"]
+        subgraph CP["Control Plane (AWS Managed)"]
+            API[Kubernetes API<br/>Manages everything]
+        end
+
+        subgraph Workers["Worker Nodes (We Managed)"]
+            CPU[CPU Nodes<br/>General workloads]
+            GPU[GPU Nodes<br/>ML processing]
+            RNODE[Redis Nodes<br/>Cache workloads]
+        end
+
+        subgraph Apps["Applications (Pods)"]
+            WS[WebSocket Proxy]
+            STT[Speech API]
+            BE[Backend API]
+            FE[Frontend Web]
+        end
+    end
+
+    subgraph Backend["Backend Services"]
+        REDIS[Redis Cluster<br/>Self-managed in K8s]
+        DB[(Database)]
+    end
+
+    USER --> DOMAINS --> ALB --> Apps
+    Apps --> REDIS
+    BE --> DB
+    Workers --> API
+```
+
+---
+
+## Pods Distributed Across Availability Zones
+
+In Kubernetes, applications run in "Pods" which are scheduled across worker nodes in different availability zones:
+
+```mermaid
+flowchart TB
+    subgraph ALB["Load Balancer"]
+        LB[Distributes traffic<br/>across all pods]
+    end
+
+    subgraph EKS["Kubernetes Cluster"]
+        subgraph AZ_A["Zone A (us-west-2a)"]
+            subgraph NodeA["Worker Node 1"]
+                WS_A1[WS-Proxy Pod]
+                BE_A1[Backend Pod]
+            end
+        end
+
+        subgraph AZ_B["Zone B (us-west-2b)"]
+            subgraph NodeB["Worker Node 2"]
+                WS_B1[WS-Proxy Pod]
+                STT_B1[STT-API Pod]
+            end
+        end
+
+        subgraph AZ_C["Zone C (us-west-2c)"]
+            subgraph NodeC["Worker Node 3"]
+                FE_C1[Frontend Pod]
+                BE_C1[Backend Pod]
+            end
+        end
+
+        subgraph Redis["Redis Namespace"]
+            R1[Redis Pod 1<br/>Zone A]
+            R2[Redis Pod 2<br/>Zone B]
+            R3[Redis Pod 3<br/>Zone C]
+        end
+    end
+
+    LB --> NodeA & NodeB & NodeC
+    WS_A1 & WS_B1 --> R1 & R2 & R3
+```
+
+---
+
+## EKS Network Layout
+
+How network traffic flows through subnets:
 
 ```mermaid
 flowchart TB
     subgraph Internet
-        Users[Users/Clients]
+        IGW[Internet Gateway]
     end
 
-    subgraph DNS["Route53 DNS"]
-        api[api.aldea.ai]
-        backend[backend.aldea.ai]
-        platform[platform.aldea.ai]
-    end
-
-    subgraph EKS["EKS Cluster: prod-eks"]
-        subgraph ControlPlane["EKS Control Plane"]
-            API_SERVER[Kubernetes API Server]
-            ETCD[(etcd)]
-        end
-
-        subgraph NodeGroups["EC2 Node Groups"]
-            CPU[cpu-nodes<br/>t3.medium]
-            GPU[gpu-nodes<br/>g4dn.xlarge]
-            REDIS_NODE[redis-nodes<br/>r6g.large]
-        end
-
-        subgraph K8sAddons["Kubernetes Add-ons"]
-            ALB_CTRL[AWS Load Balancer Controller]
-            EBS_CSI[EBS CSI Driver]
-            COREDNS[CoreDNS]
-            KUBE_PROXY[kube-proxy]
-            VPC_CNI[VPC CNI]
-        end
-
-        subgraph Helm["Helm Releases"]
-            EXT_SEC[External Secrets]
-            SEC_STORE[Secrets Store CSI]
-        end
-
-        subgraph Namespaces["Kubernetes Namespaces"]
-            subgraph Default["default namespace"]
-                WS_DEPLOY[ws-proxy<br/>Deployment]
-                WS_SVC[ws-proxy<br/>Service]
-                STT_DEPLOY[stt-api<br/>Deployment]
-                STT_SVC[stt-api<br/>Service]
-                BE_DEPLOY[imp-backend-api<br/>Deployment]
-                BE_SVC[imp-backend-api<br/>Service]
-                FE_DEPLOY[imp-frontend<br/>Deployment]
-                FE_SVC[imp-frontend<br/>Service]
-                SQS_DEPLOY[sqs-data-updator<br/>Deployment]
-            end
-
-            subgraph RedisNS["redis namespace"]
-                REDIS_CLUSTER[Redis Cluster<br/>StatefulSet]
-                REDIS_SVC[Redis Service]
-            end
-        end
-    end
-
-    subgraph ALB["Application Load Balancer"]
-        INGRESS[ALB Ingress<br/>Managed by Controller]
-    end
-
-    subgraph Backend_Services["Backend Services"]
-        subgraph RDS["RDS PostgreSQL"]
-            DB[(aldea-prod<br/>PostgreSQL)]
-        end
-
-        subgraph SQS["SQS Queue"]
-            QUEUE[usage-updates-queue]
-        end
-
-        subgraph Cognito["Cognito"]
-            USER_POOL[User Pool<br/>Authentication]
-        end
-    end
-
-    subgraph ECR["ECR Repositories"]
-        ECR_WS[ws-proxy]
-        ECR_STT[stt-api]
-        ECR_BE[imp-backend-api]
-        ECR_FE[imp-frontend]
-        ECR_SQS[sqs-data-updator]
-    end
-
-    subgraph IAM["IAM OIDC"]
-        OIDC[OIDC Provider]
-        SA_ROLES[Service Account IAM Roles]
-    end
-
-    Users --> api & backend & platform
-    api & backend & platform --> INGRESS
-    INGRESS --> WS_SVC & BE_SVC & FE_SVC
-    WS_SVC --> WS_DEPLOY
-    BE_SVC --> BE_DEPLOY
-    FE_SVC --> FE_DEPLOY
-
-    WS_DEPLOY --> REDIS_SVC
-    WS_DEPLOY --> STT_SVC
-    STT_SVC --> STT_DEPLOY
-
-    BE_DEPLOY --> DB
-    BE_DEPLOY --> USER_POOL
-    BE_DEPLOY --> QUEUE
-    SQS_DEPLOY --> QUEUE
-    SQS_DEPLOY --> DB
-
-    ALB_CTRL --> INGRESS
-    EXT_SEC --> SA_ROLES
-    SEC_STORE --> SA_ROLES
-    SA_ROLES --> OIDC
-
-    CPU & GPU & REDIS_NODE --> API_SERVER
-```
-
-## EKS Networking Architecture
-
-```mermaid
-flowchart TB
-    subgraph VPC["VPC: 10.0.0.0/16"]
-        subgraph PublicSubnets["Public Subnets"]
-            PUB_A[10.0.1.0/24<br/>us-west-2a]
-            PUB_B[10.0.2.0/24<br/>us-west-2b]
-            PUB_C[10.0.3.0/24<br/>us-west-2c]
+    subgraph VPC["Virtual Private Cloud"]
+        subgraph Public["Public Subnets (Load Balancer)"]
+            PUB_A[Zone A<br/>Load Balancer]
+            PUB_B[Zone B<br/>Load Balancer]
             NAT_A[NAT Gateway A]
             NAT_B[NAT Gateway B]
         end
 
-        subgraph PrivateSubnets["Private Subnets"]
-            PRIV_A[10.0.11.0/24<br/>us-west-2a]
-            PRIV_B[10.0.12.0/24<br/>us-west-2b]
-            PRIV_C[10.0.13.0/24<br/>us-west-2c]
-        end
-
-        subgraph Workers["EKS Worker Nodes"]
-            NODE1[Node 1<br/>us-west-2a]
-            NODE2[Node 2<br/>us-west-2b]
-            NODE3[Node 3<br/>us-west-2c]
-        end
-
-        subgraph VPCEndpoints["VPC Endpoints"]
-            EP_ECR_API[ecr.api]
-            EP_ECR_DKR[ecr.dkr]
-            EP_S3[S3 Gateway]
-            EP_STS[STS]
-            EP_LOGS[CloudWatch Logs]
-            EP_SSM[SSM]
+        subgraph Private["Private Subnets (Worker Nodes)"]
+            subgraph PrivA["Zone A"]
+                NODE_A[Worker Node<br/>with Pods]
+            end
+            subgraph PrivB["Zone B"]
+                NODE_B[Worker Node<br/>with Pods]
+            end
+            subgraph PrivC["Zone C"]
+                NODE_C[Worker Node<br/>with Pods]
+            end
         end
     end
 
-    subgraph IGW["Internet Gateway"]
-        IG[IGW]
-    end
+    IGW --> PUB_A & PUB_B
+    PUB_A --> NAT_A
+    PUB_B --> NAT_B
+    NODE_A --> NAT_A
+    NODE_B --> NAT_B
+    NODE_C --> NAT_A
 
-    PUB_A & PUB_B & PUB_C --> IG
-    NODE1 --> PRIV_A --> NAT_A --> PUB_A
-    NODE2 --> PRIV_B --> NAT_B --> PUB_B
-    NODE3 --> PRIV_C --> NAT_A
-
-    NODE1 & NODE2 & NODE3 -.-> EP_ECR_API & EP_ECR_DKR & EP_S3 & EP_STS & EP_LOGS & EP_SSM
+    PUB_A & PUB_B --> Private
 ```
 
-## EKS Deployment Model
+---
+
+## Kubernetes Components Explained
+
+```mermaid
+flowchart TB
+    subgraph Simple["What You Need to Know"]
+        direction TB
+        S1[Pods = Your running application]
+        S2[Nodes = Servers that run pods]
+        S3[Services = How pods talk to each other]
+        S4[Ingress = How traffic gets in]
+    end
+
+    subgraph Technical["Technical Details"]
+        direction TB
+        T1[ReplicaSet = Keeps N pods running]
+        T2[Deployment = Manages updates]
+        T3[StatefulSet = For databases/caches]
+        T4[ConfigMap/Secret = Configuration]
+    end
+
+    Simple --> Technical
+```
+
+---
+
+## How Services Communicated
 
 ```mermaid
 flowchart LR
-    subgraph GitHub["GitHub"]
-        REPO[Code Repository]
-        GHA[GitHub Actions]
+    subgraph Ingress["Traffic Entry"]
+        ALB[Load Balancer]
     end
 
-    subgraph CI_CD["CI/CD Pipeline"]
-        BUILD[Docker Build]
+    subgraph Services["Kubernetes Services"]
+        SVC_WS[ws-proxy:8000]
+        SVC_STT[stt-api:8800]
+        SVC_BE[backend:8000]
+        SVC_FE[frontend:3000]
+        SVC_REDIS[redis:6379]
+    end
+
+    subgraph Pods["Running Applications"]
+        WS[WS-Proxy<br/>2 replicas]
+        STT[STT-API<br/>2 replicas]
+        BE[Backend<br/>2 replicas]
+        FE[Frontend<br/>2 replicas]
+        REDIS[Redis<br/>3 replicas]
+    end
+
+    ALB --> SVC_WS & SVC_BE & SVC_FE
+    SVC_WS --> WS
+    SVC_STT --> STT
+    SVC_BE --> BE
+    SVC_FE --> FE
+    SVC_REDIS --> REDIS
+
+    WS --> SVC_STT & SVC_REDIS
+```
+
+---
+
+## Why We Moved Away from EKS
+
+```mermaid
+flowchart TB
+    subgraph EKS_Problems["EKS Challenges"]
+        E1[Complex Kubernetes<br/>learning curve]
+        E2[Node management<br/>& patching]
+        E3[Many moving parts<br/>to configure]
+        E4[Higher operational<br/>overhead]
+    end
+
+    subgraph ECS_Benefits["ECS Advantages"]
+        C1[Simpler AWS-native<br/>service]
+        C2[No servers to<br/>manage - Fargate]
+        C3[Native AWS<br/>integrations]
+        C4[Lower operational<br/>overhead]
+    end
+
+    EKS_Problems -->|Migrated to| ECS_Benefits
+```
+
+---
+
+## Deployment Pipeline (EKS)
+
+How code was deployed in the EKS era:
+
+```mermaid
+flowchart LR
+    subgraph Dev["Developer"]
+        CODE[Push code]
+    end
+
+    subgraph CI["Build"]
+        BUILD[Build image]
         PUSH[Push to ECR]
-        EKSCTL[eksctl Deploy]
-    end
-
-    subgraph EKS["EKS Cluster"]
-        DEPLOY[Kubernetes Deployment]
-        RS[ReplicaSet]
-        PODS[Pods]
-    end
-
-    REPO -->|Push| GHA
-    GHA --> BUILD --> PUSH
-    GHA --> EKSCTL
-    EKSCTL -->|kubectl apply| DEPLOY
-    DEPLOY --> RS --> PODS
-    PUSH -.->|Pull image| PODS
-```
-
-## Kubernetes Service Architecture
-
-```mermaid
-flowchart TB
-    subgraph K8s["Kubernetes Cluster"]
-        subgraph Ingress["Ingress Layer"]
-            ALB_ING[ALB Ingress]
-        end
-
-        subgraph Services["Service Layer"]
-            SVC_WS[ws-proxy:8000<br/>ClusterIP]
-            SVC_STT[stt-api:8800<br/>ClusterIP]
-            SVC_BE[imp-backend:8000<br/>ClusterIP]
-            SVC_FE[imp-frontend:3000<br/>ClusterIP]
-            SVC_REDIS[redis:6379<br/>ClusterIP]
-        end
-
-        subgraph Deployments["Deployment Layer"]
-            DEP_WS[ws-proxy<br/>replicas: 2]
-            DEP_STT[stt-api<br/>replicas: 2]
-            DEP_BE[imp-backend<br/>replicas: 2]
-            DEP_FE[imp-frontend<br/>replicas: 2]
-        end
-
-        subgraph StatefulSets["StatefulSet Layer"]
-            SS_REDIS[redis-cluster<br/>replicas: 3]
-        end
-    end
-
-    ALB_ING --> SVC_WS & SVC_BE & SVC_FE
-    SVC_WS --> DEP_WS
-    SVC_STT --> DEP_STT
-    SVC_BE --> DEP_BE
-    SVC_FE --> DEP_FE
-    SVC_REDIS --> SS_REDIS
-
-    DEP_WS --> SVC_REDIS & SVC_STT
-    DEP_BE --> SVC_REDIS
-```
-
-## EKS IAM Architecture
-
-```mermaid
-flowchart TB
-    subgraph IAM["IAM"]
-        subgraph Roles["IAM Roles"]
-            CLUSTER_ROLE[EKS Cluster Role]
-            NODE_ROLE[EKS Node Role]
-            ALB_ROLE[ALB Controller Role]
-            EBS_ROLE[EBS CSI Role]
-            BACKEND_ROLE[imp-backend-api Role]
-            FRONTEND_ROLE[imp-frontend Role]
-            SQS_ROLE[sqs-data-updator Role]
-        end
-
-        subgraph OIDC["OIDC Provider"]
-            OIDC_PROV[EKS OIDC<br/>oidc.eks.us-west-2.amazonaws.com]
-        end
     end
 
     subgraph K8s["Kubernetes"]
-        subgraph SA["Service Accounts"]
-            SA_ALB[aws-load-balancer-controller]
-            SA_EBS[ebs-csi-controller]
-            SA_BE[imp-backend-api]
-            SA_FE[imp-frontend]
-            SA_SQS[sqs-data-updator]
-        end
+        HELM[Helm chart<br/>update]
+        KUBECTL[kubectl apply]
+        DEPLOY[Rolling update]
     end
 
-    SA_ALB -->|AssumeRoleWithWebIdentity| ALB_ROLE
-    SA_EBS -->|AssumeRoleWithWebIdentity| EBS_ROLE
-    SA_BE -->|AssumeRoleWithWebIdentity| BACKEND_ROLE
-    SA_FE -->|AssumeRoleWithWebIdentity| FRONTEND_ROLE
-    SA_SQS -->|AssumeRoleWithWebIdentity| SQS_ROLE
-
-    ALB_ROLE & EBS_ROLE & BACKEND_ROLE & FRONTEND_ROLE & SQS_ROLE --> OIDC_PROV
+    CODE --> BUILD --> PUSH --> HELM --> KUBECTL --> DEPLOY
 ```
+
+---
+
+## EKS vs ECS Comparison
+
+| Aspect | EKS (Before) | ECS (Now) |
+|--------|--------------|-----------|
+| **Complexity** | High - need K8s knowledge | Low - AWS native |
+| **Servers** | Managed EC2 nodes | Serverless (Fargate) |
+| **Scaling** | Pod autoscaler + node autoscaler | Simple service autoscaling |
+| **Networking** | VPC CNI + kube-proxy | Simple awsvpc mode |
+| **Load Balancing** | Ingress controller needed | Native ALB integration |
+| **Secrets** | External Secrets operator | Direct Secrets Manager |
+| **Cost Model** | Pay for nodes + EKS fee | Pay per task |

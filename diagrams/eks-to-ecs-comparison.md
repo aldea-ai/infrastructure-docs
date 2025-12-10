@@ -1,237 +1,271 @@
-# EKS to ECS Migration Comparison
+# EKS to ECS Migration: Side-by-Side Comparison
+
+## What Changed?
+
+We moved from Kubernetes (EKS) to AWS's simpler container service (ECS) to reduce complexity and operational overhead.
+
+---
+
+## Before & After Overview
+
+```mermaid
+flowchart LR
+    subgraph Before["BEFORE: Kubernetes (EKS)"]
+        direction TB
+        B1[Complex orchestration]
+        B2[Managed EC2 servers]
+        B3[Many K8s components]
+        B4[Self-managed Redis]
+    end
+
+    subgraph After["AFTER: Containers (ECS)"]
+        direction TB
+        A1[Simple task definitions]
+        A2[Serverless Fargate]
+        A3[AWS-native services]
+        A4[Managed ElastiCache]
+    end
+
+    Before -->|Simplified| After
+```
+
+---
 
 ## Architecture Comparison
 
+### EKS (Before)
+
 ```mermaid
 flowchart TB
-    subgraph Before["BEFORE: EKS Architecture"]
-        direction TB
-        subgraph EKS_Infra["Infrastructure Layer"]
-            EKS_CP[EKS Control Plane<br/>Managed by AWS]
-            EKS_NODES[EC2 Node Groups<br/>cpu-nodes / gpu-nodes / redis-nodes]
-            EKS_ADDONS[K8s Add-ons<br/>CoreDNS / VPC-CNI / ALB Controller]
-        end
-
-        subgraph EKS_K8s["Kubernetes Layer"]
-            EKS_HELM[Helm Releases<br/>External Secrets / CSI Driver]
-            EKS_DEPLOY[Deployments<br/>ws-proxy / stt-api / backend / frontend]
-            EKS_SVC[Services<br/>ClusterIP / LoadBalancer]
-            EKS_ING[Ingress<br/>ALB Ingress Controller]
-        end
-
-        subgraph EKS_Data["Data Layer"]
-            EKS_REDIS[Redis StatefulSet<br/>In-cluster]
-            EKS_RDS[(RDS PostgreSQL)]
-        end
-
-        EKS_CP --> EKS_NODES
-        EKS_NODES --> EKS_DEPLOY
-        EKS_HELM --> EKS_DEPLOY
-        EKS_DEPLOY --> EKS_SVC --> EKS_ING
-        EKS_DEPLOY --> EKS_REDIS & EKS_RDS
+    subgraph User["Your App"]
+        APP[Application]
     end
 
-    subgraph After["AFTER: ECS Architecture"]
-        direction TB
-        subgraph ECS_Infra["Infrastructure Layer"]
-            ECS_CLUSTER[ECS Cluster<br/>Fully Managed]
-            ECS_FARGATE[Fargate Tasks<br/>Serverless Compute]
-            ECS_GA[Global Accelerator<br/>Anycast IPs]
+    subgraph K8s["Kubernetes Cluster"]
+        ING[Ingress Controller]
+        SVC[K8s Services]
+
+        subgraph Nodes["EC2 Worker Nodes"]
+            N1[Node 1]
+            N2[Node 2]
+            N3[Node 3]
         end
 
-        subgraph ECS_Services["Service Layer"]
-            ECS_WS[ws-proxy Service<br/>WebSocket Streaming]
-            ECS_HTTP[http-proxy Service<br/>HTTP Transcription]
-            ECS_BE[Backend Service<br/>Platform API]
-            ECS_FE[Frontend Service<br/>Platform UI]
-        end
-
-        subgraph ECS_Data["Data Layer"]
-            ECS_REDIS[ElastiCache Redis<br/>Managed / Multi-AZ]
-            ECS_RDS[(RDS PostgreSQL)]
-        end
-
-        ECS_CLUSTER --> ECS_FARGATE
-        ECS_FARGATE --> ECS_WS & ECS_HTTP & ECS_BE & ECS_FE
-        ECS_GA --> ECS_WS & ECS_HTTP
-        ECS_WS & ECS_HTTP --> ECS_REDIS
-        ECS_BE --> ECS_RDS
+        PODS[Application Pods]
+        REDIS_K8S[Redis StatefulSet<br/>Self-managed]
     end
 
-    Before -.->|Migration| After
+    APP --> ING --> SVC --> PODS
+    PODS --> REDIS_K8S
+    Nodes --> PODS
 ```
 
-## Component Mapping
+### ECS (After)
+
+```mermaid
+flowchart TB
+    subgraph User["Your App"]
+        APP[Application]
+    end
+
+    subgraph AWS["AWS Managed"]
+        GA[Global Accelerator]
+        WAF[Web Firewall]
+        ALB[Load Balancer]
+
+        subgraph ECS["ECS Fargate"]
+            T1[Task 1]
+            T2[Task 2]
+            T3[Task 3]
+        end
+
+        REDIS_AWS[ElastiCache Redis<br/>AWS-managed]
+    end
+
+    APP --> GA --> WAF --> ALB --> ECS
+    ECS --> REDIS_AWS
+```
+
+---
+
+## What Got Simpler
+
+```mermaid
+flowchart TB
+    subgraph Removed["Things We No Longer Manage"]
+        R1[Kubernetes API Server]
+        R2[Worker Node EC2s]
+        R3[Node Auto-scaling]
+        R4[Ingress Controller]
+        R5[CoreDNS]
+        R6[VPC CNI Plugin]
+        R7[Redis StatefulSet]
+        R8[Helm Charts]
+    end
+
+    subgraph Added["What We Use Instead"]
+        A1[ECS Cluster - managed]
+        A2[Fargate - serverless]
+        A3[Auto-scaling - native]
+        A4[ALB - native]
+        A5[Route53 - native]
+        A6[awsvpc - simple]
+        A7[ElastiCache - managed]
+        A8[Task Definitions - simple]
+    end
+
+    R1 --> A1
+    R2 --> A2
+    R3 --> A3
+    R4 --> A4
+    R5 --> A5
+    R6 --> A6
+    R7 --> A7
+    R8 --> A8
+```
+
+---
+
+## Deployment Comparison
+
+### EKS Deployment (Complex)
+
+```mermaid
+flowchart LR
+    subgraph Steps["7 Steps"]
+        S1[Build image]
+        S2[Push to ECR]
+        S3[Update Helm values]
+        S4[Helm upgrade]
+        S5[kubectl apply]
+        S6[Wait for rollout]
+        S7[Verify pods]
+    end
+
+    S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7
+```
+
+### ECS Deployment (Simple)
+
+```mermaid
+flowchart LR
+    subgraph Steps["4 Steps"]
+        S1[Build image]
+        S2[Push to ECR]
+        S3[Update service]
+        S4[Auto rolling update]
+    end
+
+    S1 --> S2 --> S3 --> S4
+```
+
+---
+
+## Service Mapping
+
+What became what:
 
 ```mermaid
 flowchart LR
     subgraph EKS["EKS Components"]
-        E1[EKS Control Plane]
-        E2[EC2 Node Groups]
-        E3[Kubernetes Deployments]
-        E4[K8s Services]
-        E5[ALB Ingress Controller]
-        E6[Redis StatefulSet]
-        E7[Helm Charts]
-        E8[eksctl / kubectl]
+        E1[Pod]
+        E2[Deployment]
+        E3[Service]
+        E4[Ingress]
+        E5[StatefulSet]
+        E6[ConfigMap]
+        E7[Secret]
     end
 
-    subgraph ECS["ECS Components"]
-        C1[ECS Cluster]
-        C2[Fargate Tasks]
-        C3[ECS Services]
-        C4[Target Groups]
-        C5[ALB + WAF + GA]
-        C6[ElastiCache Redis]
-        C7[Task Definitions]
-        C8[aws ecs CLI]
+    subgraph ECS["ECS Equivalents"]
+        C1[Task]
+        C2[Service]
+        C3[Target Group]
+        C4[ALB Rules]
+        C5[ElastiCache]
+        C6[Env Variables]
+        C7[Secrets Manager]
     end
 
-    E1 -->|Replaced by| C1
-    E2 -->|Replaced by| C2
-    E3 -->|Replaced by| C3
-    E4 -->|Replaced by| C4
-    E5 -->|Replaced by| C5
-    E6 -->|Replaced by| C6
-    E7 -->|Replaced by| C7
-    E8 -->|Replaced by| C8
+    E1 --> C1
+    E2 --> C2
+    E3 --> C3
+    E4 --> C4
+    E5 --> C5
+    E6 --> C6
+    E7 --> C7
 ```
 
-## Complexity Comparison
+---
 
-```mermaid
-graph TB
-    subgraph EKS_Complexity["EKS: Higher Complexity"]
-        EKS_1[Kubernetes API Server]
-        EKS_2[etcd State Management]
-        EKS_3[Node Group Scaling]
-        EKS_4[Pod Scheduling]
-        EKS_5[Service Mesh Options]
-        EKS_6[RBAC Configuration]
-        EKS_7[Helm Release Management]
-        EKS_8[CNI Plugin Management]
-        EKS_9[CSI Driver Setup]
-        EKS_10[Ingress Controller]
-    end
-
-    subgraph ECS_Simplicity["ECS: Simplified"]
-        ECS_1[Task Definitions]
-        ECS_2[Service Auto-scaling]
-        ECS_3[ALB Integration]
-        ECS_4[Secrets Manager]
-    end
-
-    EKS_Complexity -->|Simplified to| ECS_Simplicity
-```
-
-## Deployment Pipeline Comparison
-
-```mermaid
-flowchart LR
-    subgraph EKS_Deploy["EKS Deployment"]
-        ED1[GitHub Push] --> ED2[Build Docker Image]
-        ED2 --> ED3[Push to ECR]
-        ED3 --> ED4[Update Helm Values]
-        ED4 --> ED5[eksctl/kubectl apply]
-        ED5 --> ED6[Wait for Rollout]
-        ED6 --> ED7[Verify Pods Ready]
-    end
-
-    subgraph ECS_Deploy["ECS Deployment"]
-        CD1[GitHub Push] --> CD2[Build Docker Image]
-        CD2 --> CD3[Push to ECR]
-        CD3 --> CD4[Register Task Def]
-        CD4 --> CD5[Update Service]
-        CD5 --> CD6[Wait for Stable]
-    end
-
-    EKS_Deploy -.->|Simplified| ECS_Deploy
-```
-
-## Network Architecture Comparison
+## Cost Model Change
 
 ```mermaid
 flowchart TB
-    subgraph EKS_Net["EKS Networking"]
-        EN_USER[Users] --> EN_R53[Route53]
-        EN_R53 --> EN_ALB[ALB]
-        EN_ALB --> EN_ING[Ingress Controller]
-        EN_ING --> EN_SVC[K8s Service]
-        EN_SVC --> EN_POD[Pod]
-        EN_POD --> EN_CNI[VPC CNI]
-        EN_CNI --> EN_VPC[VPC Subnet]
+    subgraph EKS_Cost["EKS Costs"]
+        EC1[EKS Control Plane<br/>$73/month]
+        EC2[EC2 Worker Nodes<br/>Always running]
+        EC3[Node over-provisioning<br/>Wasted capacity]
     end
 
-    subgraph ECS_Net["ECS Networking"]
-        CN_USER[Users] --> CN_GA[Global Accelerator]
-        CN_GA --> CN_WAF[AWS WAF]
-        CN_WAF --> CN_ALB[ALB]
-        CN_ALB --> CN_TG[Target Group]
-        CN_TG --> CN_TASK[Fargate Task]
-        CN_TASK --> CN_ENI[ENI in VPC]
+    subgraph ECS_Cost["ECS Costs"]
+        CC1[No cluster fee<br/>$0/month]
+        CC2[Fargate Tasks<br/>Pay per second]
+        CC3[Right-sized tasks<br/>No waste]
     end
 ```
 
-## Key Differences Summary
+---
 
-| Aspect | EKS | ECS |
-|--------|-----|-----|
-| **Compute** | EC2 Node Groups | Fargate (Serverless) |
-| **Container Orchestration** | Kubernetes | ECS Native |
-| **State Management** | etcd | AWS Managed |
-| **Scaling** | HPA + Cluster Autoscaler | Service Auto Scaling |
-| **Networking** | VPC CNI + kube-proxy | awsvpc mode |
-| **Load Balancing** | ALB Ingress Controller | Native ALB Integration |
-| **Secrets** | External Secrets + CSI | Secrets Manager Direct |
-| **Service Discovery** | CoreDNS | Cloud Map (optional) |
-| **Monitoring** | Prometheus + Grafana | CloudWatch + X-Ray |
-| **Cost Model** | EC2 instances + EKS fee | Per-task pricing |
-| **Complexity** | High (K8s knowledge required) | Low (AWS native) |
-| **Flexibility** | Very High | Moderate |
-
-## Benefits of Migration
+## Reliability Comparison
 
 ```mermaid
-mindmap
-  root((ECS Benefits))
-    Operational
-      No cluster management
-      No node patching
-      Simplified deployments
-      Native AWS integration
-    Cost
-      Pay per task
-      No idle node costs
-      No EKS control plane fee
-    Security
-      Fargate isolation
-      Managed updates
-      Native IAM integration
-    Reliability
-      Multi-AZ by default
-      Global Accelerator
-      AWS WAF integration
+flowchart TB
+    subgraph EKS_HA["EKS High Availability"]
+        EH1[Control plane - AWS managed]
+        EH2[Worker nodes - You manage]
+        EH3[Node failures - You handle]
+        EH4[Pod scheduling - Complex]
+    end
+
+    subgraph ECS_HA["ECS High Availability"]
+        CH1[Cluster - AWS managed]
+        CH2[Tasks - AWS manages]
+        CH3[Failures - Auto-replaced]
+        CH4[Placement - Automatic]
+    end
 ```
 
-## Services Mapping
+---
 
-### Production Environment
+## Quick Reference
 
-| Service | EKS (Before) | ECS (After) |
-|---------|--------------|-------------|
-| WebSocket Proxy | ws-proxy Deployment | ws-proxy-live1/live2 Services |
-| HTTP Transcription | stt-api Deployment | http-proxy-live1/live2 Services |
-| Platform Backend | imp-backend-api Deployment | imp-backend Service |
-| Platform Frontend | imp-frontend Deployment | imp-frontend Service |
-| DB Sync | sqs-data-updator Deployment | sqs-updater Service |
-| Redis | Redis StatefulSet | ElastiCache Replication Group |
+| What | EKS Term | ECS Term |
+|------|----------|----------|
+| Running container | Pod | Task |
+| Keep N running | Deployment | Service |
+| Traffic routing | Ingress | ALB Listener Rules |
+| Internal networking | K8s Service | Target Group |
+| Configuration | ConfigMap | Environment Variables |
+| Secrets | K8s Secret | Secrets Manager |
+| Logs | kubectl logs | CloudWatch Logs |
+| Scaling | HPA | Service Auto Scaling |
 
-### Dev Environment
+---
 
-| Service | EKS (Before) | ECS (After) |
-|---------|--------------|-------------|
-| WebSocket Proxy | N/A | aldea-ecs-dev Service |
-| HTTP Transcription | N/A | aldea-ecs-dev-transcribe Service |
-| Platform Backend | N/A | aldea-ecs-dev-backend Service |
-| Platform Frontend | N/A | aldea-ecs-dev-frontend Service |
-| DB Sync | N/A | aldea-ecs-dev-sqs-updater Service |
+## Summary
+
+```mermaid
+flowchart LR
+    subgraph Before["Before: EKS"]
+        B[Complex<br/>Many moving parts<br/>K8s expertise needed]
+    end
+
+    subgraph After["After: ECS"]
+        A[Simple<br/>AWS-native<br/>Just works]
+    end
+
+    Before -->|Migration| After
+```
+
+**Bottom line:** We went from managing a complex Kubernetes cluster to using AWS-native services that "just work."
