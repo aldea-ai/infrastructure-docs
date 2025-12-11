@@ -55,14 +55,17 @@ flowchart TB
         ALB[Distributes requests<br/>to the right service]
     end
 
-    subgraph ECS["ECS Cluster - Proxy Layer"]
+    subgraph ECS["ECS Cluster - Services"]
         direction LR
         WS[WebSocket Proxy<br/>Live audio streaming]
         HTTP[HTTP Proxy<br/>File uploads]
+        BE[Backend API<br/>Account & billing]
+        FE[Frontend<br/>Web dashboard]
     end
 
     subgraph Data["Data Layer"]
         REDIS[Redis Cache<br/>API keys & limits]
+        RDS[(PostgreSQL<br/>User data)]
     end
 
     subgraph STT_Live["STT Live Servers (GPU VMs)"]
@@ -76,8 +79,9 @@ flowchart TB
     end
 
     USER --> DNS --> GA --> WAF --> ALB
-    ALB --> WS & HTTP
+    ALB --> WS & HTTP & BE & FE
     WS & HTTP --> REDIS
+    BE --> REDIS & RDS
     HTTP --> LIVE1 & LIVE2
     WS --> DEV1 & DEV2
 ```
@@ -146,18 +150,24 @@ flowchart TB
     subgraph AZ_A["Zone A"]
         WS_A[WS-Proxy]
         HTTP_A[HTTP-Proxy]
+        BE_A[Backend]
+        FE_A[Frontend]
         SQS_A[DB Sync]
     end
 
     subgraph AZ_B["Zone B"]
         WS_B[WS-Proxy]
         HTTP_B[HTTP-Proxy]
+        BE_B[Backend]
+        FE_B[Frontend]
         SQS_B[DB Sync]
     end
 
     subgraph Data["Data Layer (Multi-AZ)"]
         REDIS_P[(Redis Primary)]
         REDIS_R[(Redis Replica)]
+        RDS_P[(RDS Primary)]
+        RDS_R[(RDS Standby)]
     end
 
     subgraph STT_Live["STT Live Servers (GPU VMs)"]
@@ -171,8 +181,10 @@ flowchart TB
     end
 
     LB --> AZ_A & AZ_B
-    AZ_A & AZ_B --> REDIS_P
+    WS_A & WS_B & HTTP_A & HTTP_B --> REDIS_P
+    BE_A & BE_B --> REDIS_P & RDS_P
     REDIS_P <-.-> REDIS_R
+    RDS_P <-.-> RDS_R
     HTTP_A & HTTP_B --> STT_Live
     WS_A & WS_B --> STT_Dev
 ```
@@ -278,10 +290,13 @@ flowchart TB
     subgraph AZ_A["Single Zone (us-west-2a)"]
         WS[WS-Proxy]
         HTTP[HTTP-Proxy]
+        BE[Backend]
+        FE[Frontend]
     end
 
     subgraph Data["Data Layer (Single-AZ)"]
         REDIS[(Redis Single Node)]
+        RDS[(RDS Single Instance)]
     end
 
     subgraph STT_Live["STT Live Servers (GPU VMs)"]
@@ -297,6 +312,7 @@ flowchart TB
     Domains --> IGW --> ALB --> AZ_A
     AZ_A --> NAT
     WS & HTTP --> REDIS
+    BE --> REDIS & RDS
     HTTP --> STT_Live
     WS --> STT_Dev
 ```
