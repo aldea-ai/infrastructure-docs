@@ -440,7 +440,7 @@ flowchart TB
 
     subgraph ProdDeploy["Production Deployment"]
         PROD_WS[ws-proxy<br/>CodeDeploy Blue/Green]
-        PROD_HTTP[transcribe<br/>ECS Rolling]
+        PROD_HTTP[transcribe<br/>CodeDeploy Blue/Green]
         VALIDATE_P[Validation Tests<br/>api.aldea.ai]
     end
 
@@ -556,7 +556,7 @@ flowchart LR
 | Service | Repository | Dev | Staging | Production |
 |---------|------------|-----|---------|------------|
 | **ws-proxy** | aldea-proxy-services | ECS Rolling | ECS Rolling (×2) | CodeDeploy B/G |
-| **transcribe** | aldea-proxy-services | ECS Rolling | ECS Rolling (×2) | ECS Rolling |
+| **transcribe** | aldea-proxy-services | ECS Rolling | ECS Rolling (×2) | CodeDeploy B/G |
 | **Backend** | imp-backend | ECS Rolling | ECS Rolling | CodeDeploy B/G |
 | **Frontend** | imp-frontend | ECS Rolling | ECS Rolling | CodeDeploy B/G |
 | **DB Sync** | aldea-proxy-services | ECS Rolling | ECS Rolling | ECS Rolling |
