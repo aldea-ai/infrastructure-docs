@@ -89,7 +89,8 @@ flowchart TB
     WS & HTTP --> REDIS
     BE --> REDIS & RDS
     FE --> BE
-    SYNC --> RDS & SQS
+    RDS -->|NOTIFY| SYNC
+    SYNC --> SQS
     SQS --> LAMBDA
     LAMBDA --> REDIS
     HTTP --> LIVE1 & LIVE2
@@ -199,7 +200,8 @@ flowchart TB
     WS_A & WS_B & HTTP_A & HTTP_B --> REDIS_P
     BE_A & BE_B --> REDIS_P & RDS_P
     FE_A & FE_B --> BE_A & BE_B
-    SYNC_A & SYNC_B --> RDS_P & SQS
+    RDS_P -->|NOTIFY| SYNC_A & SYNC_B
+    SYNC_A & SYNC_B --> SQS
     SQS --> LAMBDA
     LAMBDA --> REDIS_P
     REDIS_P <-.-> REDIS_R
@@ -339,7 +341,8 @@ flowchart TB
     WS & HTTP --> REDIS
     BE --> REDIS & RDS
     FE --> BE
-    SYNC --> RDS & SQS
+    RDS -->|NOTIFY| SYNC
+    SYNC --> SQS
     SQS --> LAMBDA
     LAMBDA --> REDIS
     HTTP --> STT_Live
