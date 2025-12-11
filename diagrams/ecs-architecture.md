@@ -61,11 +61,17 @@ flowchart TB
         HTTP[HTTP Proxy<br/>File uploads]
         BE[Backend API<br/>Account & billing]
         FE[Frontend<br/>Web dashboard]
+        SYNC[DB Sync<br/>Redis to Postgres]
     end
 
     subgraph Data["Data Layer"]
         REDIS[Redis Cache<br/>API keys & limits]
         RDS[(PostgreSQL<br/>User data)]
+        SQS[[SQS Queue]]
+    end
+
+    subgraph Serverless["Serverless"]
+        LAMBDA[Lambda<br/>Queue processor]
     end
 
     subgraph STT_Live["STT Live Servers (GPU VMs)"]
@@ -82,6 +88,9 @@ flowchart TB
     ALB --> WS & HTTP & BE & FE
     WS & HTTP --> REDIS
     BE --> REDIS & RDS
+    FE --> BE
+    SYNC --> RDS & SQS
+    SQS --> LAMBDA
     HTTP --> LIVE1 & LIVE2
     WS --> DEV1 & DEV2
 ```
@@ -152,7 +161,7 @@ flowchart TB
         HTTP_A[HTTP-Proxy]
         BE_A[Backend]
         FE_A[Frontend]
-        SQS_A[DB Sync]
+        SYNC_A[DB Sync]
     end
 
     subgraph AZ_B["Zone B"]
@@ -160,7 +169,7 @@ flowchart TB
         HTTP_B[HTTP-Proxy]
         BE_B[Backend]
         FE_B[Frontend]
-        SQS_B[DB Sync]
+        SYNC_B[DB Sync]
     end
 
     subgraph Data["Data Layer (Multi-AZ)"]
@@ -168,6 +177,11 @@ flowchart TB
         REDIS_R[(Redis Replica)]
         RDS_P[(RDS Primary)]
         RDS_R[(RDS Standby)]
+        SQS[[SQS Queue]]
+    end
+
+    subgraph Serverless["Serverless"]
+        LAMBDA[Lambda]
     end
 
     subgraph STT_Live["STT Live Servers (GPU VMs)"]
@@ -183,6 +197,9 @@ flowchart TB
     LB --> AZ_A & AZ_B
     WS_A & WS_B & HTTP_A & HTTP_B --> REDIS_P
     BE_A & BE_B --> REDIS_P & RDS_P
+    FE_A & FE_B --> BE_A & BE_B
+    SYNC_A & SYNC_B --> RDS_P & SQS
+    SQS --> LAMBDA
     REDIS_P <-.-> REDIS_R
     RDS_P <-.-> RDS_R
     HTTP_A & HTTP_B --> STT_Live
@@ -292,11 +309,17 @@ flowchart TB
         HTTP[HTTP-Proxy]
         BE[Backend]
         FE[Frontend]
+        SYNC[DB Sync]
     end
 
     subgraph Data["Data Layer (Single-AZ)"]
         REDIS[(Redis Single Node)]
         RDS[(RDS Single Instance)]
+        SQS[[SQS Queue]]
+    end
+
+    subgraph Serverless["Serverless"]
+        LAMBDA[Lambda]
     end
 
     subgraph STT_Live["STT Live Servers (GPU VMs)"]
@@ -313,6 +336,9 @@ flowchart TB
     AZ_A --> NAT
     WS & HTTP --> REDIS
     BE --> REDIS & RDS
+    FE --> BE
+    SYNC --> RDS & SQS
+    SQS --> LAMBDA
     HTTP --> STT_Live
     WS --> STT_Dev
 ```
