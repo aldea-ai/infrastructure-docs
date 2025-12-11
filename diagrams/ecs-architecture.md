@@ -351,31 +351,212 @@ flowchart TB
 
 ---
 
-## How Code Gets Deployed
+## Branching Strategy
 
-When developers push code changes:
+All repositories follow this branching strategy:
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4a5568', 'primaryTextColor': '#000', 'primaryBorderColor': '#2d3748', 'lineColor': '#2d3748', 'secondaryColor': '#5a6577', 'tertiaryColor': '#6b7280', 'background': '#1a202c', 'mainBkg': '#4a5568', 'secondBkg': '#5a6577', 'clusterBkg': '#3d4852', 'clusterBorder': '#2d3748', 'titleColor': '#000'}}}%%
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4a5568', 'primaryTextColor': '#000', 'primaryBorderColor': '#2d3748', 'lineColor': '#2d3748', 'secondaryColor': '#5a6577', 'tertiaryColor': '#6b7280', 'clusterBkg': 'transparent', 'clusterBorder': '#2d3748', 'titleColor': '#000'}}}%%
 flowchart LR
-    subgraph Dev["Developer"]
-        CODE[Push code<br/>to GitHub]
+    subgraph Branches["Git Branches"]
+        FEAT[feature/*]
+        DEV[dev]
+        MAIN[main]
+        REL[Release Tag]
     end
 
-    subgraph CI["Automated Build"]
-        BUILD[Build container<br/>image]
-        TEST[Run tests]
-        PUSH[Push to<br/>image registry]
+    subgraph Environments["Deployment Targets"]
+        D[Dev ECS]
+        S[Staging ECS]
+        P[Prod ECS]
     end
 
-    subgraph Deploy["Deployment"]
-        UPDATE[Update service<br/>with new image]
-        ROLL[Rolling update<br/>zero downtime]
-    end
-
-    subgraph Live["Production"]
-        NEW[New version<br/>running]
-    end
-
-    CODE --> BUILD --> TEST --> PUSH --> UPDATE --> ROLL --> NEW
+    FEAT -->|PR + Tests| DEV
+    DEV -->|Auto deploy| D
+    DEV -->|Merge| MAIN
+    MAIN -->|Auto deploy| S
+    MAIN -->|Create release| REL
+    REL -->|Auto deploy| P
 ```
+
+---
+
+## CI Pipeline - Pull Requests
+
+When a PR is opened, tests run automatically:
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4a5568', 'primaryTextColor': '#000', 'primaryBorderColor': '#2d3748', 'lineColor': '#2d3748', 'secondaryColor': '#5a6577', 'tertiaryColor': '#6b7280', 'clusterBkg': 'transparent', 'clusterBorder': '#2d3748', 'titleColor': '#000'}}}%%
+flowchart LR
+    subgraph Trigger["PR Opened"]
+        PR[Pull Request]
+    end
+
+    subgraph Tests["CI Tests"]
+        PROXY[Proxy Tests<br/>Rust]
+        WS[WebSocket Tests<br/>Python]
+        LAMBDA[Lambda Tests]
+    end
+
+    subgraph Result["Outcome"]
+        PASS[✓ Ready to merge]
+        FAIL[✗ Fix required]
+    end
+
+    PR --> PROXY & WS & LAMBDA
+    PROXY & WS & LAMBDA -->|All pass| PASS
+    PROXY & WS & LAMBDA -->|Any fail| FAIL
+```
+
+---
+
+## Deployment Pipeline - aldea-proxy-services
+
+Services: **ws-proxy**, **transcribe**
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4a5568', 'primaryTextColor': '#000', 'primaryBorderColor': '#2d3748', 'lineColor': '#2d3748', 'secondaryColor': '#5a6577', 'tertiaryColor': '#6b7280', 'clusterBkg': 'transparent', 'clusterBorder': '#2d3748', 'titleColor': '#000'}}}%%
+flowchart TB
+    subgraph Triggers["Trigger"]
+        DEV_PUSH[Push to dev]
+        MAIN_PUSH[Push to main]
+        RELEASE[GitHub Release]
+    end
+
+    subgraph Build["Build"]
+        DOCKER[Docker Build<br/>linux/amd64]
+        ECR[Push to ECR]
+    end
+
+    subgraph DevDeploy["Dev Deployment"]
+        DEV_ECS[ECS Rolling Update<br/>dev-ws-proxy]
+    end
+
+    subgraph StagingDeploy["Staging Deployment"]
+        STG_WS[ws-proxy<br/>dev1 + dev2]
+        STG_HTTP[transcribe<br/>live1 + live2]
+        VALIDATE_S[Validation Tests<br/>st-api.aldea.ai]
+    end
+
+    subgraph ProdDeploy["Production Deployment"]
+        PROD_WS[ws-proxy<br/>CodeDeploy Blue/Green]
+        PROD_HTTP[transcribe<br/>ECS Rolling]
+        VALIDATE_P[Validation Tests<br/>api.aldea.ai]
+    end
+
+    DEV_PUSH --> DOCKER --> ECR --> DEV_ECS
+    MAIN_PUSH --> DOCKER --> ECR --> STG_WS & STG_HTTP --> VALIDATE_S
+    RELEASE --> DOCKER --> ECR --> PROD_WS & PROD_HTTP --> VALIDATE_P
+```
+
+---
+
+## Deployment Pipeline - imp-backend
+
+Service: **Backend API**
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4a5568', 'primaryTextColor': '#000', 'primaryBorderColor': '#2d3748', 'lineColor': '#2d3748', 'secondaryColor': '#5a6577', 'tertiaryColor': '#6b7280', 'clusterBkg': 'transparent', 'clusterBorder': '#2d3748', 'titleColor': '#000'}}}%%
+flowchart TB
+    subgraph Triggers["Trigger"]
+        MAIN_PUSH[Push to main]
+        RELEASE[GitHub Release]
+    end
+
+    subgraph Build["Build"]
+        DOCKER[Docker Build<br/>linux/amd64]
+        ECR[Push to ECR]
+    end
+
+    subgraph StagingDeploy["Staging"]
+        STG_TASK[Update Task Def]
+        STG_ECS[ECS Rolling Update<br/>staging-ws-proxy-backend]
+        SLACK_S[Slack Notification]
+    end
+
+    subgraph ProdDeploy["Production"]
+        PROD_TASK[Update Task Def]
+        CODEDEPLOY[CodeDeploy<br/>Blue/Green]
+        SLACK_P[Slack Notification]
+    end
+
+    MAIN_PUSH --> DOCKER --> ECR --> STG_TASK --> STG_ECS --> SLACK_S
+    RELEASE --> DOCKER --> ECR --> PROD_TASK --> CODEDEPLOY --> SLACK_P
+```
+
+---
+
+## Deployment Pipeline - imp-frontend
+
+Service: **Frontend Web App**
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4a5568', 'primaryTextColor': '#000', 'primaryBorderColor': '#2d3748', 'lineColor': '#2d3748', 'secondaryColor': '#5a6577', 'tertiaryColor': '#6b7280', 'clusterBkg': 'transparent', 'clusterBorder': '#2d3748', 'titleColor': '#000'}}}%%
+flowchart TB
+    subgraph Triggers["Trigger"]
+        MAIN_PUSH[Push to main]
+        RELEASE[GitHub Release]
+    end
+
+    subgraph Build["Build"]
+        SECRETS[Fetch NEXT_PUBLIC_*<br/>from Secrets Manager]
+        DOCKER[Docker Build<br/>with build args]
+        ECR[Push to ECR]
+    end
+
+    subgraph StagingDeploy["Staging"]
+        STG_TASK[Update Task Def]
+        STG_ECS[ECS Rolling Update<br/>staging-ws-proxy-frontend]
+        SLACK_S[Slack Notification]
+    end
+
+    subgraph ProdDeploy["Production"]
+        PROD_TASK[Update Task Def]
+        CODEDEPLOY[CodeDeploy<br/>Blue/Green]
+        SLACK_P[Slack Notification]
+    end
+
+    MAIN_PUSH --> SECRETS --> DOCKER --> ECR --> STG_TASK --> STG_ECS --> SLACK_S
+    RELEASE --> SECRETS --> DOCKER --> ECR --> PROD_TASK --> CODEDEPLOY --> SLACK_P
+```
+
+---
+
+## CodeDeploy Blue/Green Deployment
+
+Production services use CodeDeploy for zero-downtime deployments:
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4a5568', 'primaryTextColor': '#000', 'primaryBorderColor': '#2d3748', 'lineColor': '#2d3748', 'secondaryColor': '#5a6577', 'tertiaryColor': '#6b7280', 'clusterBkg': 'transparent', 'clusterBorder': '#2d3748', 'titleColor': '#000'}}}%%
+flowchart LR
+    subgraph Before["Before Deployment"]
+        BLUE[Blue Tasks<br/>Current version]
+        ALB_B[ALB routing<br/>100% traffic]
+    end
+
+    subgraph During["During Deployment"]
+        BLUE2[Blue Tasks]
+        GREEN[Green Tasks<br/>New version]
+        ALB_D[ALB testing<br/>Green target group]
+    end
+
+    subgraph After["After Success"]
+        GREEN2[Green Tasks<br/>New version]
+        ALB_A[ALB routing<br/>100% traffic]
+        TERM[Blue terminated<br/>after 5 min]
+    end
+
+    Before --> During --> After
+```
+
+---
+
+## Deployment Summary by Service
+
+| Service | Repository | Dev | Staging | Production |
+|---------|------------|-----|---------|------------|
+| **ws-proxy** | aldea-proxy-services | ECS Rolling | ECS Rolling (×2) | CodeDeploy B/G |
+| **transcribe** | aldea-proxy-services | ECS Rolling | ECS Rolling (×2) | ECS Rolling |
+| **Backend** | imp-backend | ECS Rolling | ECS Rolling | CodeDeploy B/G |
+| **Frontend** | imp-frontend | ECS Rolling | ECS Rolling | CodeDeploy B/G |
+| **DB Sync** | aldea-proxy-services | ECS Rolling | ECS Rolling | ECS Rolling |
