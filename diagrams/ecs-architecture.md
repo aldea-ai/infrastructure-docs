@@ -560,3 +560,163 @@ flowchart LR
 | **Backend** | imp-backend | ECS Rolling | ECS Rolling | CodeDeploy B/G |
 | **Frontend** | imp-frontend | ECS Rolling | ECS Rolling | CodeDeploy B/G |
 | **DB Sync** | aldea-proxy-services | ECS Rolling | ECS Rolling | ECS Rolling |
+
+---
+
+## Environment Domains
+
+Each environment has dedicated domains for all services:
+
+| Service | Production | Staging | Dev |
+|---------|------------|---------|-----|
+| **ASR API** | api.aldea.ai | st-api.aldea.ai | dev-api.aldea.ai |
+| **Backend API** | backend.aldea.ai | st-backend.aldea.ai | - |
+| **Frontend** | platform.aldea.ai | st-frontend.aldea.ai | - |
+| **Grafana** | grafana.aldea.ai | - | - |
+
+### Domain Routing
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4a5568', 'primaryTextColor': '#000', 'primaryBorderColor': '#2d3748', 'lineColor': '#2d3748', 'secondaryColor': '#5a6577', 'tertiaryColor': '#6b7280', 'clusterBkg': 'transparent', 'clusterBorder': '#2d3748', 'titleColor': '#000'}}}%%
+flowchart TB
+    subgraph Domains["Public Domains"]
+        API_PROD[api.aldea.ai]
+        API_STG[st-api.aldea.ai]
+        API_DEV[dev-api.aldea.ai]
+    end
+
+    subgraph GA["Global Accelerator"]
+        GA_PROD[Prod GA<br/>Anycast IPs]
+        GA_STG[Staging GA<br/>Anycast IPs]
+    end
+
+    subgraph ECS["ECS Clusters"]
+        PROD[prod-ws-proxy]
+        STG[staging-ws-proxy]
+        DEV[dev-ws-proxy]
+    end
+
+    API_PROD --> GA_PROD --> PROD
+    API_STG --> GA_STG --> STG
+    API_DEV --> DEV
+```
+
+---
+
+## Staging Environment
+
+Staging mirrors production architecture but uses different STT server routing for testing.
+
+### Staging Architecture
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4a5568', 'primaryTextColor': '#000', 'primaryBorderColor': '#2d3748', 'lineColor': '#2d3748', 'secondaryColor': '#5a6577', 'tertiaryColor': '#6b7280', 'clusterBkg': 'transparent', 'clusterBorder': '#2d3748', 'titleColor': '#000'}}}%%
+flowchart TB
+    subgraph Domains["Staging Domains"]
+        ST_API[st-api.aldea.ai]
+        ST_BACK[st-backend.aldea.ai]
+        ST_FRONT[st-frontend.aldea.ai]
+    end
+
+    subgraph GA["Global Accelerator"]
+        ST_GA[Staging GA]
+    end
+
+    subgraph ALB["Load Balancer"]
+        ST_ALB[staging-ws-proxy ALB]
+    end
+
+    subgraph ECS["ECS Cluster (staging-ws-proxy)"]
+        direction LR
+        ST_WS[ws-proxy<br/>WebSocket]
+        ST_HTTP[transcribe<br/>HTTP]
+        ST_BE[Backend API]
+        ST_FE[Frontend]
+    end
+
+    subgraph Data["Data Layer"]
+        ST_REDIS[(Redis)]
+        ST_RDS[(PostgreSQL)]
+    end
+
+    subgraph STT["STT Servers"]
+        DEV1[stt-api-dev-1]
+        DEV2[stt-api-dev-2]
+    end
+
+    ST_API --> ST_GA --> ST_ALB
+    ST_BACK --> ST_ALB
+    ST_FRONT --> ST_ALB
+    ST_ALB --> ST_WS & ST_HTTP & ST_BE & ST_FE
+    ST_WS & ST_HTTP --> ST_REDIS
+    ST_BE --> ST_REDIS & ST_RDS
+    ST_FE --> ST_BE
+    ST_WS --> DEV1 & DEV2
+    ST_HTTP --> DEV1 & DEV2
+```
+
+### Staging vs Production
+
+| Aspect | Production | Staging |
+|--------|------------|---------|
+| **STT Servers** | stt-api-live-1, stt-api-live-2 | stt-api-dev-1, stt-api-dev-2 |
+| **Multi-AZ** | Yes | Yes |
+| **CodeDeploy** | Blue/Green | Rolling updates |
+| **Global Accelerator** | Yes | Yes |
+| **Redis** | Cluster mode | Cluster mode |
+
+---
+
+## Redis Seeding and Org Sync
+
+API keys are cached in Redis for fast validation. The sync process ensures Redis stays up-to-date with the source database.
+
+### Sync Architecture
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4a5568', 'primaryTextColor': '#000', 'primaryBorderColor': '#2d3748', 'lineColor': '#2d3748', 'actorBkg': '#4a5568', 'actorBorder': '#2d3748', 'actorTextColor': '#000', 'signalColor': '#2d3748', 'signalTextColor': '#000'}}}%%
+sequenceDiagram
+    participant RDS as PostgreSQL
+    participant SYNC as DB Sync Service
+    participant SQS as SQS Queue
+    participant LAMBDA as Lambda Processor
+    participant REDIS as Redis Cache
+
+    Note over RDS,REDIS: Real-time Org/API Key Sync
+
+    RDS->>SYNC: NOTIFY on org changes
+    SYNC->>SQS: Queue update message
+    SQS->>LAMBDA: Trigger processor
+    LAMBDA->>RDS: Fetch org details
+    LAMBDA->>REDIS: Update cache
+```
+
+### Components
+
+| Component | Description |
+|-----------|-------------|
+| **DB Sync Service** | ECS service listening for PostgreSQL NOTIFY events |
+| **SQS Queue** | `prod-ws-proxy-org-sync` - buffers update messages |
+| **Lambda Processor** | Processes queue messages and updates Redis |
+| **Redis** | Caches org data with API keys and rate limits |
+
+### Redis Data Structure
+
+```
+org:{org_id}:api_keys     # Set of API key hashes
+org:{org_id}:limits       # Hash of rate limits
+apikey:{key_hash}         # Points to org_id
+```
+
+### Initial Seeding
+
+On deployment or Redis reset, initial seeding is triggered:
+
+```bash
+# Invoke Lambda to seed all orgs
+AWS_PROFILE=aldea-prod aws lambda invoke \
+  --function-name prod-ws-proxy-redis-seeder \
+  --payload '{"seed_all": true}' \
+  --region us-west-2 \
+  /tmp/response.json
+```
