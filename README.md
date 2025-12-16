@@ -7,6 +7,8 @@ Visual diagrams explaining Aldea's cloud infrastructure architecture.
 | Diagram | What It Shows |
 |---------|---------------|
 | [ECS Architecture](diagrams/ecs-architecture.md) | **Current** production setup using AWS ECS |
+| [Multi-Cloud GPU Architecture](diagrams/multi-cloud-gpu-architecture.md) | **Proposed** multi-cloud GPU backend with ASGs |
+| [Monitoring & Observability](diagrams/monitoring-observability.md) | Prometheus, Grafana, alerting, and metrics |
 | [EKS Architecture](diagrams/eks-architecture.md) | **Previous** Kubernetes-based setup (historical) |
 | [Migration Comparison](diagrams/eks-to-ecs-comparison.md) | Side-by-side comparison of EKS vs ECS |
 
@@ -25,6 +27,16 @@ Your App → api.aldea.ai → Load Balancer → ECS Services → Speech Engine
                                               ↓
                                           Redis Cache
                                           (API keys)
+```
+
+### Monitoring
+
+```
+Prometheus → Blackbox → STT Servers
+     ↓
+  Grafana → Alerts → Slack
+     ↓
+CloudWatch ← EMF Metrics ← ECS Services
 ```
 
 ## Viewing the Diagrams
@@ -46,6 +58,7 @@ You can also:
 | Repo | Purpose |
 |------|---------|
 | [aldea-proxy-services](https://github.com/aldea-ai/aldea-proxy-services) | Proxy service code |
-| [aldea-eks-platform](https://github.com/aldea-ai/aldea-eks-platform) | Terraform infrastructure |
+| [aldea-iac-platform](https://github.com/aldea-ai/aldea-iac-platform) | Terraform infrastructure |
+| [aldea-observability-platform](https://github.com/aldea-ai/aldea-observability-platform) | Grafana dashboards and alerts |
 | [imp-backend](https://github.com/aldea-ai/imp-backend) | Platform API |
 | [imp-frontend](https://github.com/aldea-ai/imp-frontend) | Web dashboard |
