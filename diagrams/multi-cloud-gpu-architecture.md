@@ -21,14 +21,12 @@ flowchart TB
         WAF[Web Application Firewall]
     end
 
-    subgraph ECS["ECS Cluster - Proxy Layer"]
-        direction LR
+    subgraph ECS["AWS ECS Cluster"]
+        direction TB
         WS[WebSocket Proxy<br/>Live streaming]
         HTTP[HTTP Proxy<br/>File uploads]
-    end
-
-    subgraph LB["GPU Backend Load Balancer"]
-        GLB[Intelligent Router<br/>Routes to healthy GPU pools]
+        ROUTER[GPU Router<br/>Intelligent routing]
+        REDIS[(Redis Cache<br/>API keys & state)]
     end
 
     subgraph AWS_GPU["AWS GPU Pool"]
@@ -60,8 +58,9 @@ flowchart TB
     end
 
     USER --> DNS --> GA --> WAF --> ECS
-    WS & HTTP --> GLB
-    GLB --> AWS_ASG & GCP_ASG & CW_ASG & OP_ASG
+    WS & HTTP --> REDIS
+    WS & HTTP --> ROUTER
+    ROUTER --> AWS_ASG & GCP_ASG & CW_ASG & OP_ASG
     AWS_ASG --> AWS_1 & AWS_2 & AWS_N
     GCP_ASG --> GCP_1 & GCP_2 & GCP_N
     CW_ASG --> CW_1 & CW_2 & CW_N
@@ -88,16 +87,15 @@ flowchart TB
         ALB[Application LB]
     end
 
-    subgraph AWS_ECS["AWS ECS - Proxy Tier"]
+    subgraph AWS_ECS["AWS ECS Cluster"]
         WS_PROXY[WS-Proxy Service<br/>WebSocket handling]
         HTTP_PROXY[Transcribe Service<br/>HTTP handling]
         REDIS[(ElastiCache Redis<br/>API keys & routing)]
-    end
-
-    subgraph ROUTER["Intelligent GPU Router"]
-        CTRL[Controller Service]
-        HM[Health Monitor]
-        LB_LOGIC[Load Balancing Logic<br/>- Latency-based<br/>- Cost-aware<br/>- Capacity-based]
+        subgraph ROUTER["GPU Router Service"]
+            CTRL[Controller]
+            HM[Health Monitor]
+            LB_LOGIC[Load Balancer<br/>Latency/Cost/Capacity]
+        end
     end
 
     subgraph AWS_POOL["AWS GPU Pool (us-west-2)"]
@@ -357,7 +355,11 @@ flowchart LR
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4a5568', 'primaryTextColor': '#000', 'primaryBorderColor': '#2d3748', 'lineColor': '#2d3748', 'clusterBkg': 'transparent', 'clusterBorder': '#2d3748', 'titleColor': '#000'}}}%%
 flowchart TB
     subgraph AWS_VPC["AWS VPC (10.0.0.0/16)"]
-        ECS[ECS Cluster<br/>Proxy Services]
+        subgraph ECS["ECS Cluster (10.0.10.0/24)"]
+            PROXY[WS/HTTP Proxy]
+            ROUTER[GPU Router]
+            REDIS[(Redis)]
+        end
         AWS_GPU_SUBNET[GPU Subnet<br/>10.0.100.0/24]
     end
 
@@ -379,10 +381,11 @@ flowchart TB
         AWS_OP[AWS-OnPrem<br/>Direct Connect / VPN]
     end
 
-    ECS <--> AWS_GPU_SUBNET
-    AWS_VPC <--> AWS_GCP <--> GCP_VPC
-    AWS_VPC <--> AWS_CW <--> CW_VPC
-    AWS_VPC <--> AWS_OP <--> ONPREM
+    PROXY --> ROUTER
+    ROUTER <--> AWS_GPU_SUBNET
+    ROUTER <--> AWS_GCP <--> GCP_VPC
+    ROUTER <--> AWS_CW <--> CW_VPC
+    ROUTER <--> AWS_OP <--> ONPREM
 ```
 
 ---
