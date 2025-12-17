@@ -31,29 +31,29 @@ flowchart TB
 
     subgraph AWS_GPU["AWS GPU Pool"]
         AWS_ASG[Auto Scaling Group]
-        AWS_1[GPU Node 1<br/>g4dn.xlarge]
-        AWS_2[GPU Node 2<br/>g4dn.xlarge]
+        AWS_1[GPU Node 1]
+        AWS_2[GPU Node 2]
         AWS_N[GPU Node N]
     end
 
     subgraph GCP_GPU["GCP GPU Pool"]
         GCP_ASG[Managed Instance Group]
-        GCP_1[GPU Node 1<br/>n1-standard + T4]
-        GCP_2[GPU Node 2<br/>n1-standard + T4]
+        GCP_1[GPU Node 1]
+        GCP_2[GPU Node 2]
         GCP_N[GPU Node N]
     end
 
     subgraph CW_GPU["CoreWeave GPU Pool"]
         CW_ASG[Virtual Server Group]
-        CW_1[GPU Node 1<br/>RTX A4000]
-        CW_2[GPU Node 2<br/>RTX A4000]
+        CW_1[GPU Node 1]
+        CW_2[GPU Node 2]
         CW_N[GPU Node N]
     end
 
     subgraph ONPREM_GPU["On-Premises GPU Pool"]
         OP_ASG[Bare Metal Cluster]
-        OP_1[GPU Server 1<br/>RTX 4090]
-        OP_2[GPU Server 2<br/>RTX 4090]
+        OP_1[GPU Server 1]
+        OP_2[GPU Server 2]
         OP_N[GPU Server N]
     end
 
@@ -102,9 +102,9 @@ flowchart TB
         direction TB
         AWS_LB[Network Load Balancer]
         subgraph AWS_ASG["Auto Scaling Group"]
-            AWS_G1[g4dn.xlarge<br/>T4 GPU]
-            AWS_G2[g4dn.xlarge<br/>T4 GPU]
-            AWS_G3[g4dn.2xlarge<br/>T4 GPU]
+            AWS_G1[GPU Node 1]
+            AWS_G2[GPU Node 2]
+            AWS_G3[GPU Node 3]
         end
         AWS_METRICS[CloudWatch<br/>Metrics]
     end
@@ -113,9 +113,9 @@ flowchart TB
         direction TB
         GCP_LB[Cloud Load Balancer]
         subgraph GCP_MIG["Managed Instance Group"]
-            GCP_G1[n1-standard-4<br/>T4 GPU]
-            GCP_G2[n1-standard-4<br/>T4 GPU]
-            GCP_G3[n1-standard-8<br/>T4 GPU]
+            GCP_G1[GPU Node 1]
+            GCP_G2[GPU Node 2]
+            GCP_G3[GPU Node 3]
         end
         GCP_METRICS[Cloud Monitoring<br/>Metrics]
     end
@@ -124,9 +124,9 @@ flowchart TB
         direction TB
         CW_LB[Load Balancer]
         subgraph CW_VSG["Virtual Server Scaling"]
-            CW_G1[VS with<br/>RTX A4000]
-            CW_G2[VS with<br/>RTX A4000]
-            CW_G3[VS with<br/>RTX A5000]
+            CW_G1[GPU Node 1]
+            CW_G2[GPU Node 2]
+            CW_G3[GPU Node 3]
         end
         CW_METRICS[Prometheus<br/>Metrics]
     end
@@ -135,9 +135,9 @@ flowchart TB
         direction TB
         OP_LB[HAProxy / Nginx]
         subgraph OP_CLUSTER["Bare Metal Cluster"]
-            OP_G1[Server 1<br/>RTX 4090 x2]
-            OP_G2[Server 2<br/>RTX 4090 x2]
-            OP_G3[Server 3<br/>RTX 4090 x2]
+            OP_G1[GPU Server 1]
+            OP_G2[GPU Server 2]
+            OP_G3[GPU Server 3]
         end
         OP_METRICS[Prometheus<br/>Metrics]
     end
@@ -230,10 +230,10 @@ flowchart LR
     end
 
     subgraph Instances["GPU Instances"]
-        G1[g4dn.xlarge]
-        G2[g4dn.xlarge]
-        G3[g4dn.xlarge]
-        G4[g4dn.xlarge]
+        G1[GPU Node 1]
+        G2[GPU Node 2]
+        G3[GPU Node 3]
+        G4[GPU Node 4]
     end
 
     subgraph NLB["Network Load Balancer"]
@@ -264,10 +264,10 @@ flowchart LR
     end
 
     subgraph VMs["GPU VMs"]
-        VM1[n1-standard-4 + T4]
-        VM2[n1-standard-4 + T4]
-        VM3[n1-standard-4 + T4]
-        VM4[n1-standard-4 + T4]
+        VM1[GPU Node 1]
+        VM2[GPU Node 2]
+        VM3[GPU Node 3]
+        VM4[GPU Node 4]
     end
 
     subgraph GLB["Cloud Load Balancer"]
@@ -298,10 +298,10 @@ flowchart LR
     end
 
     subgraph Pods["GPU Pods"]
-        P1[Pod + RTX A4000]
-        P2[Pod + RTX A4000]
-        P3[Pod + RTX A4000]
-        P4[Pod + RTX A4000]
+        P1[GPU Pod 1]
+        P2[GPU Pod 2]
+        P3[GPU Pod 3]
+        P4[GPU Pod 4]
     end
 
     subgraph SVC["Kubernetes Service"]
@@ -332,10 +332,10 @@ flowchart LR
     end
 
     subgraph Servers["Bare Metal Servers"]
-        S1[Server 1<br/>RTX 4090 x2]
-        S2[Server 2<br/>RTX 4090 x2]
-        S3[Server 3<br/>RTX 4090 x2]
-        S4[Server 4<br/>Reserved]
+        S1[GPU Server 1]
+        S2[GPU Server 2]
+        S3[GPU Server 3]
+        S4[GPU Server 4<br/>Reserved]
     end
 
     subgraph LB["HAProxy"]
@@ -431,7 +431,6 @@ sequenceDiagram
 
 | Aspect | AWS | GCP | CoreWeave | On-Premises |
 |--------|-----|-----|-----------|-------------|
-| **GPU Types** | T4, A10G, A100 | T4, A100, L4 | RTX A4000/A5000, A100 | RTX 4090, A6000 |
 | **Scaling** | ASG (auto) | MIG (auto) | HPA (auto) | Manual / semi-auto |
 | **Min Latency** | ~15ms | ~25ms | ~20ms | ~10ms |
 | **Spot/Preemptible** | Yes | Yes | Yes | N/A |
